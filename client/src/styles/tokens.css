@@ -1,0 +1,99 @@
+/* ODO design tokens. "Paper" = light, "Night Drive" = dark (.dark on <html>).
+   Every colour, font, radius and motion value in the app comes from here. */
+
+:root {
+  /* Brand + neutrals (Paper) */
+  --odo-bg: #f3f4f6;
+  --odo-surface: #ffffff;
+  --odo-surface-alt: #e9ebee;
+  --odo-text: #15171a;
+  --odo-muted: #5b616b;
+  --odo-steel: #8a94a0;
+  --odo-hairline: rgba(21, 23, 26, 0.12);
+  --odo-signal: #da2c2d;
+  --odo-red-bright: #dd363c;
+  --odo-red-deep: #b3181f;
+  --odo-red-tint: #ffe3e1;
+  --odo-slate: #37474f;
+  --odo-green: #1f7a4d;
+  --odo-amber: #b26b00;
+  --odo-danger: #b3181f;
+  --odo-on-signal: #ffffff;
+  --odo-glow: none;
+
+  /* Type */
+  --font-display: 'Archivo Variable', 'Archivo', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+
+  /* Shape + motion */
+  --radius: 0px;
+  --radius-input: 2px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-hover: 200ms;
+  --dur-state: 400ms;
+  --dur-enter: 800ms;
+  --stagger: 40ms;
+
+  /* shadcn variable mapping */
+  --background: var(--odo-bg);
+  --foreground: var(--odo-text);
+  --card: var(--odo-surface);
+  --card-foreground: var(--odo-text);
+  --popover: var(--odo-surface);
+  --popover-foreground: var(--odo-text);
+  --primary: var(--odo-signal);
+  --primary-foreground: var(--odo-on-signal);
+  --secondary: var(--odo-text);
+  --secondary-foreground: var(--odo-bg);
+  --muted: var(--odo-surface-alt);
+  --muted-foreground: var(--odo-muted);
+  --accent: var(--odo-red-tint);
+  --accent-foreground: var(--odo-red-deep);
+  --destructive: var(--odo-danger);
+  --border: var(--odo-hairline);
+  --input: var(--odo-hairline);
+  --ring: var(--odo-signal);
+}
+
+.dark {
+  --odo-bg: #0e1319;
+  --odo-surface: #161d26;
+  --odo-surface-alt: #1e2732;
+  --odo-text: #eef0f3;
+  --odo-muted: #9ba3ad;
+  --odo-steel: #6b7682;
+  --odo-hairline: rgba(238, 240, 243, 0.14);
+  --odo-signal: #ec4549;
+  --odo-red-bright: #f2575b;
+  --odo-red-deep: #ff7a7d;
+  --odo-red-tint: #3a1f22;
+  --odo-slate: #2b3a44;
+  --odo-green: #4cc38a;
+  --odo-amber: #ffb020;
+  --odo-danger: #ff7a7d;
+  --odo-on-signal: #0e1319;
+  --odo-glow: 0 0 12px rgba(255, 176, 32, 0.35);
+}
+
+/* The stats band is always Night Drive, regardless of theme. */
+.night-drive {
+  --odo-bg: #0e1319;
+  --odo-surface: #161d26;
+  --odo-surface-alt: #1e2732;
+  --odo-text: #eef0f3;
+  --odo-muted: #9ba3ad;
+  --odo-hairline: rgba(238, 240, 243, 0.14);
+  --odo-amber: #ffb020;
+  --odo-glow: 0 0 12px rgba(255, 176, 32, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-hover: 0ms;
+    --dur-state: 0ms;
+    --dur-enter: 0ms;
+    --stagger: 0ms;
+  }
+}
+
