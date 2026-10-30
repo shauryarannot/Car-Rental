@@ -50,8 +50,22 @@
 }
 
 @layer base {
-  * { border-color: var(--border); }
-  html { scroll-behavior: auto; }
+  * {
+    border-color: var(--border);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    display: none;
+  }
+  html {
+    scroll-behavior: auto;
+    color-scheme: light;
+    scrollbar-width: none;
+  }
+  html.dark { color-scheme: dark; }
   body {
     background: var(--background);
     color: var(--foreground);
@@ -61,6 +75,10 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     transition: background-color var(--dur-state) var(--ease), color var(--dur-state) var(--ease);
+  }
+  select, option {
+    background-color: var(--card);
+    color: var(--foreground);
   }
   :focus-visible {
     outline: 2px solid var(--odo-signal);

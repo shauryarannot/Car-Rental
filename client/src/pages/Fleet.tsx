@@ -23,7 +23,7 @@ function Chip({ active, children, onClick }: { active: boolean; children: React.
       aria-pressed={active}
       className={cn(
         'min-h-10 border px-4 text-sm font-medium transition-colors duration-200',
-        active ? 'border-ink bg-ink text-paper' : 'border-hairline bg-card hover:border-ink',
+        active ? 'border-ink bg-ink text-paper' : 'border-hairline bg-card text-ink hover:border-ink',
       )}
     >
       {children}
@@ -102,32 +102,83 @@ export default function Fleet() {
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 pb-24">
-      {/* Trip bar */}
-      <div className="sticky top-14 z-30 -mx-6 border-b border-hairline bg-background/95 px-6 py-4 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-          <div>
-            <p className="mono-label text-muted-foreground">Pick-up</p>
-            <p className="font-medium">Today</p>
-          </div>
-          <label>
-            <span className="mono-label block text-muted-foreground">Return</span>
+      {/* Top filter bar (normal flow at the top of the page, never floating mid-screen) */}
+      <div className="-mx-6 border-b border-hairline bg-card px-6 py-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Duration</span>
+            <select
+              value={days}
+              onChange={(e) => set('days', String(clampDays(Number(e.target.value))))}
+              aria-label="Trip duration in days"
+              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+            >
+              {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d} className="bg-card text-ink">
+                  {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d))})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Return date</span>
             <input
-              type="date" value={returnDateFor(days)} min={returnDateFor(1)} max={returnDateFor(MAX_DAYS)}
+              type="date"
+              value={returnDateFor(days)}
+              min={returnDateFor(1)}
+              max={returnDateFor(MAX_DAYS)}
               onChange={(e) => e.target.value && set('days', String(clampDays(daysUntil(e.target.value))))}
-              className="bg-transparent font-medium outline-none"
+              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
               aria-label={`Return date, ${prettyDate(returnDateFor(days))}`}
             />
           </label>
-          <span className="mono-label border border-hairline px-2 py-1">{days} {days === 1 ? 'day' : 'days'}</span>
+
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Category</span>
+            <select
+              value={category}
+              onChange={(e) => set('category', e.target.value || null)}
+              aria-label="Filter by category"
+              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+            >
+              <option value="" className="bg-card text-ink">All categories</option>
+              {cats.data?.map((c) => (
+                <option key={c.id} value={String(c.id)} className="bg-card text-ink">
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <input
-            type="search" value={q} onChange={(e) => set('q', e.target.value)} placeholder="Search a model"
+            type="search"
+            value={q}
+            onChange={(e) => set('q', e.target.value)}
+            placeholder="Search a model…"
             aria-label="Search a model"
-            className="min-h-10 flex-1 border-b border-hairline bg-transparent outline-none focus:border-signal sm:max-w-xs"
+            className="min-h-12 flex-1 border border-hairline bg-card px-3 text-sm text-ink outline-none focus:border-signal sm:max-w-xs"
           />
-          <select value={sort} onChange={(e) => set('sort', e.target.value === 'relevance' ? null : e.target.value)} aria-label="Sort" className="min-h-10 border border-hairline bg-card px-3 text-sm">
-            {sorts.map((s) => <option key={s.v} value={s.v}>{s.label}</option>)}
-          </select>
-          <button type="button" className="mono-label min-h-10 border border-hairline px-3 lg:hidden" onClick={() => setShowFilters(true)}>Filters</button>
+
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Sort by</span>
+            <select
+              value={sort}
+              onChange={(e) => set('sort', e.target.value === 'relevance' ? null : e.target.value)}
+              aria-label="Sort"
+              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+            >
+              {sorts.map((s) => (
+                <option key={s.v} value={s.v} className="bg-card text-ink">
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button type="button" className="mono-label min-h-12 border border-hairline bg-card px-4 lg:hidden" onClick={() => setShowFilters(true)}>
+            Filters
+          </button>
         </div>
       </div>
 
@@ -137,7 +188,7 @@ export default function Fleet() {
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[280px_1fr]">
         <aside className="hidden lg:block">
-          <div className="sticky top-40">{filters}</div>
+          <div className="sticky top-20">{filters}</div>
         </aside>
 
         <div>
@@ -148,7 +199,7 @@ export default function Fleet() {
               <Button variant="secondary" className="mt-6" onClick={() => cars.refetch()}>Retry</Button>
             </div>
           ) : cars.isLoading ? (
-            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 9 }, (_, i) => <CarCardSkeleton key={i} />)}
             </div>
           ) : list.length === 0 ? (
@@ -158,11 +209,11 @@ export default function Fleet() {
               <Button variant="secondary" className="mt-6" onClick={() => setParams(new URLSearchParams({ days: String(days) }))}>Reset filters</Button>
             </div>
           ) : (
-            <motion.div layout className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              <AnimatePresence mode="popLayout">
-                {list.map((c, i) => <CarCard key={c.id} car={c} days={days} index={i} />)}
-              </AnimatePresence>
-            </motion.div>
+            <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {list.map((c, i) => (
+                <CarCard key={c.id} car={c} days={days} index={i} />
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -170,7 +221,7 @@ export default function Fleet() {
       {/* Mobile filter sheet */}
       <AnimatePresence>
         {showFilters && (
-          <motion.div className="fixed inset-0 z-[60] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="fixed inset-0 z-[60] lg:hidden" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-ink/40" onClick={() => setShowFilters(false)} />
             <motion.div
               role="dialog" aria-modal aria-label="Filters"

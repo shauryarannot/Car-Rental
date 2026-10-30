@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { motion, useScroll, useSpring } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/app/theme'
 import { cn } from '@/lib/utils'
@@ -9,21 +10,17 @@ const links = [
   { to: '/bookings', label: 'My bookings' },
 ]
 
-/** Slim hairline bar. Red bright at the top of the page, paper with a hairline after scroll. Hides on scroll down. */
+/** Fixed top navbar. Stays pinned at top-0 and shows a subtle hairline scroll progress bar. */
 export function Navbar() {
   const { theme, toggle } = useTheme()
   const [scrolled, setScrolled] = useState(false)
-  const [hidden, setHidden] = useState(false)
   const [open, setOpen] = useState(false)
+  const { scrollYProgress } = useScroll()
+  const scaleX = useSpring(scrollYProgress, { stiffness: 140, damping: 28, mass: 0.2 })
 
   useEffect(() => {
-    let last = window.scrollY
-    const onScroll = () => {
-      const y = window.scrollY
-      setScrolled(y > 80)
-      setHidden(y > last && y > 240)
-      last = y
-    }
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -31,9 +28,8 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        'fixed inset-x-0 top-0 z-50 border-b transition-[transform,background-color] duration-[400ms] ease-odo',
-        scrolled ? 'border-hairline bg-background text-ink' : 'border-transparent bg-red-bright text-white',
-        hidden && !open && '-translate-y-full',
+        'fixed inset-x-0 top-0 z-50 border-b transition-colors duration-[400ms] ease-odo',
+        scrolled ? 'border-hairline bg-background/95 text-ink backdrop-blur-sm' : 'border-transparent bg-red-bright text-white',
       )}
     >
       <nav aria-label="Primary" className="mx-auto flex h-14 max-w-[1440px] items-center gap-8 px-6">
@@ -73,6 +69,17 @@ export function Navbar() {
           </button>
         </div>
       </nav>
+
+      {/* Subtle scroll progress hairline along the bottom edge of the fixed navbar */}
+      <motion.div
+        aria-hidden
+        style={{ scaleX }}
+        className={cn(
+          'pointer-events-none absolute inset-x-0 bottom-0 h-[2px] origin-left',
+          scrolled ? 'bg-signal' : 'bg-white/75',
+        )}
+      />
+
       {open && (
         <ul id="mobile-menu" className="border-t border-hairline bg-background px-6 py-4 text-ink sm:hidden">
           {[...links, { to: '/fleet', label: 'Book' }].map((l) => (
@@ -87,4 +94,3 @@ export function Navbar() {
     </header>
   )
 }
-

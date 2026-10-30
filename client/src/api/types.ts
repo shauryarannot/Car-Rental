@@ -101,6 +101,7 @@ export interface Api {
   /** Backend has no cancel; this maps to PUT /rentals/{id}/return. */
   cancelBooking(id: number): Promise<Rental>
   listCoupons(): Promise<DiscountCoupon[]>
+  listCustomers(): Promise<Customer[]>
   /** No auth yet: bookings are looked up by the email used to book. */
   bookingsByEmail(email: string): Promise<Rental[]>
 }

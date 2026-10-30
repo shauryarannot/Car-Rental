@@ -13,3 +13,5 @@ export const useCategories = () =>
 export const useCoupons = () =>
   useQuery({ queryKey: ['coupons'], queryFn: () => api.listCoupons(), staleTime: 10 * 60_000 })
 
+export const useCustomers = () =>
+  useQuery({ queryKey: ['customers'], queryFn: () => api.listCustomers(), staleTime: 5 * 60_000 })

@@ -86,6 +86,7 @@ export const mockApi: Api = {
       { id: 2, code: 'WEEKEND10', couponType: 'DURATION', discountPercent: 10, minDays: 1, maxDays: 3 },
       { id: 3, code: 'MOTHERSON20', couponType: 'EMPLOYEE', discountPercent: 20 },
     ]),
+  listCustomers: () => wait([...customers]),
   bookingsByEmail: (email) =>
     wait(rentals.filter((r) => r.customer.email.toLowerCase() === email.trim().toLowerCase())),
 }

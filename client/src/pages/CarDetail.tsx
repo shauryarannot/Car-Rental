@@ -6,8 +6,8 @@ import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
-import { api, isApiError, type BenefitType } from '@/api'
-import { useCar, useCars, useCoupons } from '@/hooks/queries'
+import { api, isApiError, type BenefitType, type DiscountCoupon } from '@/api'
+import { useCar, useCars, useCoupons, useCustomers } from '@/hooks/queries'
 import { CarImage } from '@/components/car/CarImage'
 import { CarCard } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
-import { MAX_DAYS, clampDays, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
 
 const schema = z.object({
@@ -27,6 +27,12 @@ const schema = z.object({
 })
 type Form = z.infer<typeof schema>
 
+function couponDescription(c: DiscountCoupon) {
+  if (c.couponType === 'FIRST_RENTAL') return `${Number(c.discountPercent)}% off — First rental only`
+  if (c.couponType === 'EMPLOYEE') return `${Number(c.discountPercent)}% off — Motherson employee (needs Employee ID)`
+  return `${Number(c.discountPercent)}% off — Trips of ${c.minDays} to ${c.maxDays} days`
+}
+
 export default function CarDetail() {
   const { id } = useParams()
   const [params] = useSearchParams()
@@ -35,11 +41,21 @@ export default function CarDetail() {
   const car = useCar(Number(id))
   const all = useCars()
   const coupons = useCoupons()
+  const customers = useCustomers()
 
   const [days, setDays] = useState(clampDays(Number(params.get('days') ?? 2)))
   const [benefit, setBenefit] = useState<BenefitType>('NONE')
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: { phone: '' } })
-  const couponCode = watch('couponCode')?.toUpperCase()
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<Form>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', email: '', phone: '', employeeId: '', couponCode: '' },
+  })
+  const couponCode = watch('couponCode')?.toUpperCase() ?? ''
 
   const book = useMutation({
     mutationFn: (f: Form) =>
@@ -49,7 +65,7 @@ export default function CarDetail() {
         startDate: today(),
         endDate: returnDateFor(days),
         benefit,
-        couponCode: benefit === 'COUPON' ? f.couponCode?.toUpperCase() : undefined,
+        couponCode: benefit === 'COUPON' ? f.couponCode?.trim().toUpperCase() : undefined,
       }),
     onSuccess: (rental) => {
       localStorage.setItem('odo-email', rental.customer.email)
@@ -81,18 +97,25 @@ export default function CarDetail() {
 
   const c = car.data
   const catPct = Number(c.category.discountPercent) || 0
-  const coupon = coupons.data?.find((x) => x.code === couponCode)
+  const coupon = coupons.data?.find((x) => x.code.toUpperCase() === couponCode)
   const pct = benefit === 'CATEGORY_DISCOUNT' ? catPct : benefit === 'COUPON' && coupon ? Number(coupon.discountPercent) : 0
   const gross = c.pricePerDay * days
   const total = gross - (gross * pct) / 100
   const similar = (all.data ?? []).filter((x) => x.category.id === c.category.id && x.id !== c.id && x.available).slice(0, 3)
 
   const benefits: { v: BenefitType; label: string; note: string; disabled?: boolean }[] = [
-    { v: 'NONE', label: 'No offer', note: 'Standard rate.' },
+    { v: 'NONE', label: 'No offer', note: 'Standard daily rate.' },
     { v: 'CATEGORY_DISCOUNT', label: `${c.category.name} discount`, note: catPct ? `${catPct}% off this category.` : 'No discount on this category.', disabled: !catPct },
-    { v: 'COUPON', label: 'Coupon code', note: 'Checked when you confirm.' },
-    { v: 'FREE_UPGRADE', label: 'Free upgrade', note: 'Next car up, same price, if one is free.' },
+    { v: 'COUPON', label: 'Coupon code', note: 'Choose a coupon from the dropdown.' },
+    { v: 'FREE_UPGRADE', label: 'Free upgrade', note: 'Next car up at the same price.' },
   ]
+
+  const selectBenefit = (next: BenefitType) => {
+    setBenefit(next)
+    if (next === 'COUPON' && !couponCode && coupons.data?.length) {
+      setValue('couponCode', coupons.data[0].code, { shouldValidate: true })
+    }
+  }
 
   return (
     <div className="mx-auto max-w-[1440px] px-6 pb-24">
@@ -139,45 +162,128 @@ export default function CarDetail() {
             <form onSubmit={handleSubmit((f) => book.mutate(f))} className="mt-8 space-y-8 border-t border-hairline pt-8" noValidate>
               {/* Trip */}
               <fieldset>
-                <legend className="mono-label text-muted-foreground">Trip</legend>
-                <div className="mt-3 grid grid-cols-2 border border-hairline">
-                  <div className="border-r border-hairline p-4">
-                    <p className="mono-label text-muted-foreground">Pick-up</p>
-                    <p className="mt-1 font-medium">Today</p>
-                    <p className="mono-label mt-1 text-muted-foreground">{prettyDate(today())}</p>
-                  </div>
-                  <div className="p-4">
-                    <label htmlFor="days" className="mono-label text-muted-foreground">Days</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <button type="button" aria-label="One day fewer" onClick={() => setDays((d) => clampDays(d - 1))} className="size-8 border border-hairline hover:border-ink">−</button>
-                      <input id="days" type="number" min={1} max={MAX_DAYS} value={days} onChange={(e) => setDays(clampDays(+e.target.value))} className="mono w-10 bg-transparent text-center text-lg outline-none" />
-                      <button type="button" aria-label="One day more" onClick={() => setDays((d) => clampDays(d + 1))} className="size-8 border border-hairline hover:border-ink">+</button>
-                    </div>
-                    <p className="mono-label mt-1 text-muted-foreground">Return {prettyDate(returnDateFor(days))}</p>
-                  </div>
+                <legend className="mono-label text-muted-foreground">Trip duration & dates</legend>
+                <div className="mt-3 grid grid-cols-1 border border-hairline bg-card sm:grid-cols-2">
+                  <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-b-0 sm:border-r">
+                    <span className="mono-label text-muted-foreground">Duration (days)</span>
+                    <select
+                      value={days}
+                      onChange={(e) => setDays(clampDays(Number(e.target.value)))}
+                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                    >
+                      {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={d} className="bg-card text-ink">
+                          {d} {d === 1 ? 'day' : 'days'} — {formatINR(c.pricePerDay * d)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mono-label mt-2 text-muted-foreground">Pick-up: Today ({prettyDate(today())})</span>
+                  </label>
+
+                  <label className="flex flex-col justify-between p-4">
+                    <span className="mono-label text-muted-foreground">Return date</span>
+                    <input
+                      type="date"
+                      value={returnDateFor(days)}
+                      min={returnDateFor(1)}
+                      max={returnDateFor(MAX_DAYS)}
+                      onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value)))}
+                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                    />
+                    <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days))}</span>
+                  </label>
                 </div>
               </fieldset>
 
               {/* Offer */}
               <fieldset>
                 <legend className="mono-label text-muted-foreground">Offer · one per rental</legend>
-                <div className="mt-3 grid grid-cols-2 gap-2">
+
+                <label className="mt-3 block">
+                  <span className="sr-only">Select offer type</span>
+                  <select
+                    value={benefit}
+                    onChange={(e) => selectBenefit(e.target.value as BenefitType)}
+                    className="w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                  >
+                    {benefits.map((b) => (
+                      <option key={b.v} value={b.v} disabled={b.disabled} className="bg-card text-ink">
+                        {b.label} — {b.note}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="mt-3 grid grid-cols-2 items-stretch gap-2">
                   {benefits.map((b) => (
-                    <label key={b.v} className={cn('cursor-pointer border p-3 transition-colors duration-200', benefit === b.v ? 'border-ink bg-ink text-paper' : 'border-hairline hover:border-ink', b.disabled && 'pointer-events-none opacity-40')}>
-                      <input type="radio" name="benefit" value={b.v} checked={benefit === b.v} disabled={b.disabled} onChange={() => setBenefit(b.v)} className="sr-only" />
+                    <button
+                      key={b.v}
+                      type="button"
+                      disabled={b.disabled}
+                      onClick={() => selectBenefit(b.v)}
+                      aria-pressed={benefit === b.v}
+                      className={cn(
+                        'flex h-full flex-col justify-between border p-3 text-left transition-colors duration-200',
+                        benefit === b.v ? 'border-ink bg-ink text-paper' : 'border-hairline bg-card text-ink hover:border-ink',
+                        b.disabled && 'pointer-events-none opacity-40',
+                      )}
+                    >
                       <span className="block text-sm font-medium">{b.label}</span>
-                      <span className="mt-1 block text-xs opacity-70">{b.note}</span>
-                    </label>
+                      <span className="mt-1 block text-xs opacity-75">{b.note}</span>
+                    </button>
                   ))}
                 </div>
+
                 {benefit === 'COUPON' && (
-                  <Input className="mt-4" label="Coupon code" placeholder="e.g. WELCOME50" {...register('couponCode')} />
+                  <div className="mt-4 space-y-4 border border-hairline bg-card p-4">
+                    <label className="block">
+                      <span className="mono-label text-muted-foreground">Choose an available coupon</span>
+                      <select
+                        value={coupon?.code ?? ''}
+                        onChange={(e) => setValue('couponCode', e.target.value, { shouldValidate: true })}
+                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                      >
+                        <option value="" className="bg-card text-ink">— Select a coupon code —</option>
+                        {coupons.data?.map((cp) => (
+                          <option key={cp.id} value={cp.code} className="bg-card text-ink">
+                            {cp.code} · {couponDescription(cp)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <Input label="Or type coupon code" placeholder="e.g. WELCOME50" {...register('couponCode')} />
+                  </div>
                 )}
               </fieldset>
 
               {/* Driver */}
               <fieldset className="space-y-5">
-                <legend className="mono-label text-muted-foreground">Driver</legend>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <legend className="mono-label text-muted-foreground">Driver details</legend>
+                  {customers.data && customers.data.length > 0 && (
+                    <select
+                      aria-label="Fill with existing customer"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const found = customers.data?.find((x) => String(x.id) === e.target.value)
+                        if (found) {
+                          setValue('name', found.name, { shouldValidate: true })
+                          setValue('email', found.email, { shouldValidate: true })
+                          setValue('phone', found.phone ?? '', { shouldValidate: true })
+                          setValue('employeeId', found.employeeId ?? '', { shouldValidate: true })
+                        }
+                      }}
+                      className="max-w-56 cursor-pointer border border-hairline bg-card px-2 py-1 text-xs text-ink outline-none focus:border-signal"
+                    >
+                      <option value="" className="bg-card text-ink">Quick-fill returning customer…</option>
+                      {customers.data.slice(0, 40).map((cust) => (
+                        <option key={cust.id} value={String(cust.id)} className="bg-card text-ink">
+                          {cust.name} {cust.employeeId ? `(${cust.employeeId})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 <Input label="Full name" autoComplete="name" error={errors.name?.message} {...register('name')} />
                 <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
                 <div className="grid gap-5 sm:grid-cols-2">
@@ -211,7 +317,7 @@ export default function CarDetail() {
       {similar.length > 0 && (
         <section className="mt-24">
           <p className="mono-label text-muted-foreground">More {c.category.name}</p>
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {similar.map((s, i) => <CarCard key={s.id} car={s} days={days} index={i} />)}
           </div>
         </section>
@@ -219,4 +325,3 @@ export default function CarDetail() {
     </div>
   )
 }
-

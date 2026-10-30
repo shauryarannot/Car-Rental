@@ -45,6 +45,7 @@ export const realApi: Api = {
   getBooking: (id) => http<Rental>(`/api/rentals/${id}`),
   cancelBooking: (id) => http<Rental>(`/api/rentals/${id}/return`, { method: 'PUT' }),
   listCoupons: () => http<DiscountCoupon[]>('/api/coupons'),
+  listCustomers: () => http<Customer[]>('/api/customers'),
   async bookingsByEmail(email) {
     const all = await http<Customer[]>('/api/customers')
     const c = all.find((x) => x.email.toLowerCase() === email.trim().toLowerCase())
