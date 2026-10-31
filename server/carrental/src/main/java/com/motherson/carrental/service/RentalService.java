@@ -8,6 +8,7 @@ import com.motherson.carrental.enums.BenefitType;
 import com.motherson.carrental.enums.RentalStatus;
 import com.motherson.carrental.exception.RentalNotFoundException;
 import com.motherson.carrental.repository.RentalRepository;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,18 +43,31 @@ public class RentalService {
 		return rentalRepository.findById(id).orElseThrow(() -> new RentalNotFoundException(id));
 	}
 
+	// Owner or admin only
+	public Rental getByIdFor(Long id, String email, boolean admin) {
+		Rental rental = getById(id);
+		checkOwner(rental, email, admin);
+		return rental;
+	}
+
+	// The logged-in customer's own rentals
+	public List<Rental> getMine(String email) {
+		Customer customer = customerService.getByEmail(email);
+		return rentalRepository.findByCustomerIdOrderByStartDateDesc(customer.getId());
+	}
+
 	public List<Rental> getHistory(Long customerId) {
 		customerService.getById(customerId); // 404 if the customer doesn't exist
 		return rentalRepository.findByCustomerIdOrderByStartDateDesc(customerId);
 	}
 
 	@Transactional
-	public Rental rent(Long customerId, Long vehicleId, int days, BenefitType benefit, String couponCode) {
+	public Rental rent(String email, Long vehicleId, int days, BenefitType benefit, String couponCode) {
 		if (days < 1 || days > MAX_DAYS) {
 			throw new IllegalArgumentException("Rental days must be between 1 and " + MAX_DAYS);
 		}
 
-		Customer customer = customerService.getById(customerId);
+		Customer customer = customerService.getByEmail(email);
 		if (!customer.isActive()) {
 			throw new IllegalArgumentException("Customer is not active");
 		}
@@ -108,14 +122,22 @@ public class RentalService {
 	}
 
 	@Transactional
-	public Rental returnVehicle(Long rentalId) {
+	public Rental returnVehicle(Long rentalId, String email, boolean admin) {
 		Rental rental = getById(rentalId);
+		checkOwner(rental, email, admin);
 		if (rental.getStatus() == RentalStatus.COMPLETED) {
 			throw new IllegalArgumentException("Rental is already completed");
 		}
 		rental.setStatus(RentalStatus.COMPLETED);
 		vehicleService.setAvailable(rental.getVehicle().getId(), true);
 		return rentalRepository.save(rental);
+	}
+
+	// A customer may only touch their own rentals
+	private void checkOwner(Rental rental, String email, boolean admin) {
+		if (!admin && !rental.getCustomer().getEmail().equalsIgnoreCase(email)) {
+			throw new AccessDeniedException("This rental belongs to another customer");
+		}
 	}
 
 	// Checks that the coupon exists and that this customer and rental length

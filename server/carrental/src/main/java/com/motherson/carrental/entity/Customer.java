@@ -1,6 +1,8 @@
 package com.motherson.carrental.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.motherson.carrental.enums.Role;
 
 @Entity
 public class Customer {
@@ -23,6 +25,14 @@ public class Customer {
     // false means the customer is deactivated (soft deleted)
     private boolean active = true;
 
+    // Stored as a BCrypt hash. WRITE_ONLY: accepted in requests, never sent back.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role = Role.CUSTOMER;
+
     public Customer() { }
 
     public Long getId() { return id; }
@@ -42,4 +52,10 @@ public class Customer {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
 }

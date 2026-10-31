@@ -1,9 +1,29 @@
-// Types mirror the Spring Boot entities in server/carrental exactly.
-// Money arrives as JSON numbers (BigDecimal), dates as yyyy-MM-dd.
+// Types mirror the Spring Boot entities and DTOs in server/carrental.
 
 export type RentalStatus = 'ACTIVE' | 'COMPLETED'
 export type BenefitType = 'NONE' | 'COUPON' | 'CATEGORY_DISCOUNT' | 'FREE_UPGRADE'
 export type CouponType = 'FIRST_RENTAL' | 'DURATION' | 'EMPLOYEE'
+export type Role = 'ADMIN' | 'CUSTOMER'
+
+export interface AuthResponse {
+  token: string
+  role: Role
+  customerId: number
+  name: string
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface RegisterRequest {
+  name: string
+  email: string
+  password: string
+  phone?: string
+  employeeId?: string
+}
 
 export interface Category {
   id: number
@@ -26,6 +46,7 @@ export interface Customer {
   phone?: string | null
   employeeId?: string | null
   active: boolean
+  role?: Role
 }
 
 export interface Rental {
@@ -58,7 +79,7 @@ export interface ApiError {
   unreachable: boolean
 }
 
-/** View model the design works with. Derived from Vehicle, never invented. */
+/** View model the design works with. Derived from Vehicle. */
 export interface Car {
   id: number
   make: string
@@ -67,21 +88,42 @@ export interface Car {
   pricePerDay: number
   available: boolean
   category: Category
-  // Not provided by the backend yet. Optional so UI can omit them cleanly.
   imageUrl?: string
-  seats?: number
-  transmission?: string
-  fuelType?: string
-  year?: number
 }
 
 export interface BookingRequest {
   vehicleId: number
-  customer: { name: string; email: string; phone?: string; employeeId?: string }
   startDate: string
   endDate: string
   benefit?: BenefitType
   couponCode?: string
+}
+
+export interface VehiclePayload {
+  name: string
+  dailyRate: number
+  available: boolean
+  category: { id: number }
+}
+
+export interface CategoryPayload {
+  name: string
+  discountPercent: number
+}
+
+export interface CouponPayload {
+  code: string
+  couponType: CouponType
+  discountPercent: number
+  minDays?: number | null
+  maxDays?: number | null
+}
+
+export interface CustomerPayload {
+  name: string
+  email: string
+  phone?: string | null
+  employeeId?: string | null
 }
 
 export interface CarFilters {
@@ -90,19 +132,44 @@ export interface CarFilters {
   search?: string
 }
 
-/** The one interface both the real backend and the mock implement. */
+/** The single interface both the real backend and the mock implement. */
 export interface Api {
+  // Auth (public)
+  login(req: LoginRequest): Promise<AuthResponse>
+  register(req: RegisterRequest): Promise<Customer>
+
+  // Browse (authenticated)
   listCars(filters?: CarFilters): Promise<Car[]>
   getCar(id: number): Promise<Car>
   listCategories(): Promise<Category[]>
-  createBooking(req: BookingRequest): Promise<Rental>
-  listBookings(): Promise<Rental[]>
-  getBooking(id: number): Promise<Rental>
-  /** Backend has no cancel; this maps to PUT /rentals/{id}/return. */
-  cancelBooking(id: number): Promise<Rental>
   listCoupons(): Promise<DiscountCoupon[]>
-  listCustomers(): Promise<Customer[]>
-  /** No auth yet: bookings are looked up by the email used to book. */
-  bookingsByEmail(email: string): Promise<Rental[]>
-}
 
+  // Rentals (customer & admin)
+  createBooking(req: BookingRequest): Promise<Rental>
+  myBookings(): Promise<Rental[]>
+  getBooking(id: number): Promise<Rental>
+  cancelBooking(id: number): Promise<Rental>
+  listBookings(): Promise<Rental[]>
+  customerBookings(customerId: number): Promise<Rental[]>
+
+  // Admin CRUD: Vehicles
+  createVehicle(payload: VehiclePayload): Promise<Car>
+  updateVehicle(id: number, payload: VehiclePayload): Promise<Car>
+  deleteVehicle(id: number): Promise<void>
+
+  // Admin CRUD: Categories
+  createCategory(payload: CategoryPayload): Promise<Category>
+  updateCategory(id: number, payload: CategoryPayload): Promise<Category>
+  deleteCategory(id: number): Promise<void>
+
+  // Admin CRUD: Coupons
+  createCoupon(payload: CouponPayload): Promise<DiscountCoupon>
+  updateCoupon(id: number, payload: CouponPayload): Promise<DiscountCoupon>
+  deleteCoupon(id: number): Promise<void>
+
+  // Admin CRUD: Customers
+  listCustomers(): Promise<Customer[]>
+  createCustomer(payload: CustomerPayload): Promise<Customer>
+  updateCustomer(id: number, payload: CustomerPayload): Promise<Customer>
+  deactivateCustomer(id: number): Promise<void>
+}

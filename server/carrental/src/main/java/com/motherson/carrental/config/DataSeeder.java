@@ -8,6 +8,7 @@ import com.motherson.carrental.entity.Vehicle;
 import com.motherson.carrental.enums.BenefitType;
 import com.motherson.carrental.enums.CouponType;
 import com.motherson.carrental.enums.RentalStatus;
+import com.motherson.carrental.enums.Role;
 import com.motherson.carrental.repository.CategoryRepository;
 import com.motherson.carrental.repository.CustomerRepository;
 import com.motherson.carrental.repository.DiscountCouponRepository;
@@ -17,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,18 +56,20 @@ public class DataSeeder implements CommandLineRunner {
     private final CustomerRepository customerRepository;
     private final DiscountCouponRepository couponRepository;
     private final RentalRepository rentalRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // Fixed seed so every restart produces the same data set.
     private final Random rnd = new Random(42);
 
     public DataSeeder(CategoryRepository categoryRepository, VehicleRepository vehicleRepository,
                       CustomerRepository customerRepository, DiscountCouponRepository couponRepository,
-                      RentalRepository rentalRepository) {
+                      RentalRepository rentalRepository, PasswordEncoder passwordEncoder) {
         this.categoryRepository = categoryRepository;
         this.vehicleRepository = vehicleRepository;
         this.customerRepository = customerRepository;
         this.couponRepository = couponRepository;
         this.rentalRepository = rentalRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -187,6 +191,29 @@ public class DataSeeder implements CommandLineRunner {
 
         List<Customer> list = new ArrayList<>();
         Set<String> emails = new HashSet<>();
+        String defaultHash = passwordEncoder.encode("Customer@123");
+
+        // Two predictable demo customer accounts (standard + Motherson employee)
+        Object[][] demos = {
+                {"Aarav Sharma", "customer@carrental.com", "+91 9810010001", null},
+                {"Priya Nair", "employee@motherson.com", "+91 9810010002", "MSN10000"},
+        };
+        for (Object[] d : demos) {
+            String em = (String) d[1];
+            emails.add(em);
+            if (!customerRepository.existsByEmail(em)) {
+                Customer demo = new Customer();
+                demo.setName((String) d[0]);
+                demo.setEmail(em);
+                demo.setPhone((String) d[2]);
+                demo.setEmployeeId((String) d[3]);
+                demo.setPassword(defaultHash);
+                demo.setRole(Role.CUSTOMER);
+                demo.setActive(true);
+                list.add(customerRepository.save(demo));
+            }
+        }
+
         int employeeNo = 10001;
         while (list.size() < 180) {
             String f = pick(first);
@@ -195,13 +222,15 @@ public class DataSeeder implements CommandLineRunner {
             String email = employee
                     ? (f + "." + l).toLowerCase() + "@motherson.com"
                     : (f + "." + l + (rnd.nextInt(90) + 10)).toLowerCase() + "@" + pick(domains);
-            if (!emails.add(email)) continue;
+            if (!emails.add(email) || customerRepository.existsByEmail(email)) continue;
 
             Customer c = new Customer();
             c.setName(f + " " + l);
             c.setEmail(email);
             c.setPhone("+91 " + (rnd.nextInt(4) + 6) + String.format("%09d", rnd.nextInt(1_000_000_000)));
             c.setEmployeeId(employee ? "MSN" + (employeeNo++) : null);
+            c.setPassword(defaultHash);
+            c.setRole(Role.CUSTOMER);
             c.setActive(rnd.nextDouble() > 0.05); // ~5% deactivated
             list.add(customerRepository.save(c));
         }

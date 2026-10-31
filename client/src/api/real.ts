@@ -1,9 +1,14 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { http, vehicleToCar } from './http'
-import type { Api, Category, Customer, DiscountCoupon, Rental, Vehicle } from './types'
+import type { Api, AuthResponse, Category, Customer, DiscountCoupon, Rental, Vehicle } from './types'
 
-/** Real backend. Endpoints: /api/vehicles, /api/categories, /api/customers, /api/rentals. */
+/** Real Spring Boot backend with JWT auth and role-based endpoints. */
 export const realApi: Api = {
+  // Auth
+  login: (req) => http<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(req) }),
+  register: (req) => http<Customer>('/api/auth/register', { method: 'POST', body: JSON.stringify(req) }),
+
+  // Browse
   async listCars(f = {}) {
     let path = '/api/vehicles'
     if (f.search) path = `/api/vehicles/search?name=${encodeURIComponent(f.search)}`
@@ -18,22 +23,14 @@ export const realApi: Api = {
     return vehicleToCar(await http<Vehicle>(`/api/vehicles/${id}`))
   },
   listCategories: () => http<Category[]>('/api/categories'),
+  listCoupons: () => http<DiscountCoupon[]>('/api/coupons'),
 
+  // Rentals
   async createBooking(req) {
     const days = differenceInCalendarDays(parseISO(req.endDate), parseISO(req.startDate))
     if (days < 1) throw { status: 400, message: 'Return date must be after pick-up.', unreachable: false }
 
-    // No auth yet: find the customer by email, otherwise register them.
-    const all = await http<Customer[]>('/api/customers')
-    let customer = all.find((c) => c.email.toLowerCase() === req.customer.email.toLowerCase())
-    if (!customer) {
-      customer = await http<Customer>('/api/customers', {
-        method: 'POST',
-        body: JSON.stringify({ ...req.customer, active: true }),
-      })
-    }
     const q = new URLSearchParams({
-      customerId: String(customer.id),
       vehicleId: String(req.vehicleId),
       days: String(days),
     })
@@ -41,16 +38,34 @@ export const realApi: Api = {
     if (req.couponCode) q.set('couponCode', req.couponCode)
     return http<Rental>(`/api/rentals?${q}`, { method: 'POST' })
   },
-  listBookings: () => http<Rental[]>('/api/rentals'),
+  myBookings: () => http<Rental[]>('/api/rentals/my'),
   getBooking: (id) => http<Rental>(`/api/rentals/${id}`),
   cancelBooking: (id) => http<Rental>(`/api/rentals/${id}/return`, { method: 'PUT' }),
-  listCoupons: () => http<DiscountCoupon[]>('/api/coupons'),
-  listCustomers: () => http<Customer[]>('/api/customers'),
-  async bookingsByEmail(email) {
-    const all = await http<Customer[]>('/api/customers')
-    const c = all.find((x) => x.email.toLowerCase() === email.trim().toLowerCase())
-    if (!c) return []
-    return http<Rental[]>(`/api/rentals/customer/${c.id}`)
-  },
-}
+  listBookings: () => http<Rental[]>('/api/rentals'),
+  customerBookings: (customerId) => http<Rental[]>(`/api/rentals/customer/${customerId}`),
 
+  // Admin: Vehicles
+  async createVehicle(payload) {
+    return vehicleToCar(await http<Vehicle>('/api/vehicles', { method: 'POST', body: JSON.stringify(payload) }))
+  },
+  async updateVehicle(id, payload) {
+    return vehicleToCar(await http<Vehicle>(`/api/vehicles/${id}`, { method: 'PUT', body: JSON.stringify(payload) }))
+  },
+  deleteVehicle: (id) => http<void>(`/api/vehicles/${id}`, { method: 'DELETE' }),
+
+  // Admin: Categories
+  createCategory: (payload) => http<Category>('/api/categories', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCategory: (id, payload) => http<Category>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteCategory: (id) => http<void>(`/api/categories/${id}`, { method: 'DELETE' }),
+
+  // Admin: Coupons
+  createCoupon: (payload) => http<DiscountCoupon>('/api/coupons', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCoupon: (id, payload) => http<DiscountCoupon>(`/api/coupons/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteCoupon: (id) => http<void>(`/api/coupons/${id}`, { method: 'DELETE' }),
+
+  // Admin: Customers
+  listCustomers: () => http<Customer[]>('/api/customers'),
+  createCustomer: (payload) => http<Customer>('/api/customers', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCustomer: (id, payload) => http<Customer>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deactivateCustomer: (id) => http<void>(`/api/customers/${id}`, { method: 'DELETE' }),
+}

@@ -1,13 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
 import { api, isApiError, type BenefitType, type DiscountCoupon } from '@/api'
-import { useCar, useCars, useCoupons, useCustomers } from '@/hooks/queries'
+import { useAuth } from '@/app/auth'
+import { useCar, useCars, useCategories, useCoupons } from '@/hooks/queries'
 import { CarImage } from '@/components/car/CarImage'
 import { CarCard } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
@@ -18,18 +16,9 @@ import { Counter } from '@/components/fx/Counter'
 import { MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
 
-const schema = z.object({
-  name: z.string().trim().min(2, 'Tell us your full name.'),
-  email: z.string().trim().email('That email does not look right.'),
-  phone: z.string().trim().regex(/^[+\d\s-]{8,}$/, 'Enter a phone number with at least 8 digits.').or(z.literal('')),
-  employeeId: z.string().trim().optional(),
-  couponCode: z.string().trim().optional(),
-})
-type Form = z.infer<typeof schema>
-
 function couponDescription(c: DiscountCoupon) {
   if (c.couponType === 'FIRST_RENTAL') return `${Number(c.discountPercent)}% off — First rental only`
-  if (c.couponType === 'EMPLOYEE') return `${Number(c.discountPercent)}% off — Motherson employee (needs Employee ID)`
+  if (c.couponType === 'EMPLOYEE') return `${Number(c.discountPercent)}% off — Motherson employee`
   return `${Number(c.discountPercent)}% off — Trips of ${c.minDays} to ${c.maxDays} days`
 }
 
@@ -38,42 +27,64 @@ export default function CarDetail() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { user, isAdmin, isCustomer } = useAuth()
   const car = useCar(Number(id))
   const all = useCars()
+  const categories = useCategories()
   const coupons = useCoupons()
-  const customers = useCustomers()
 
   const [days, setDays] = useState(clampDays(Number(params.get('days') ?? 2)))
   const [benefit, setBenefit] = useState<BenefitType>('NONE')
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<Form>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: '', email: '', phone: '', employeeId: '', couponCode: '' },
-  })
-  const couponCode = watch('couponCode')?.toUpperCase() ?? ''
+  const [couponCode, setCouponCode] = useState('')
+
+  // Admin inline vehicle editor state
+  const [editName, setEditName] = useState('')
+  const [editRate, setEditRate] = useState(0)
+  const [editCatId, setEditCatId] = useState(1)
+  const [editAvail, setEditAvail] = useState(true)
+
+  useEffect(() => {
+    if (car.data) {
+      setEditName(car.data.name)
+      setEditRate(car.data.pricePerDay)
+      setEditCatId(car.data.category.id)
+      setEditAvail(car.data.available)
+    }
+  }, [car.data])
 
   const book = useMutation({
-    mutationFn: (f: Form) =>
+    mutationFn: () =>
       api.createBooking({
         vehicleId: Number(id),
-        customer: { name: f.name, email: f.email, phone: f.phone || undefined, employeeId: f.employeeId || undefined },
         startDate: today(),
         endDate: returnDateFor(days),
         benefit,
-        couponCode: benefit === 'COUPON' ? f.couponCode?.trim().toUpperCase() : undefined,
+        couponCode: benefit === 'COUPON' ? couponCode.trim().toUpperCase() : undefined,
       }),
     onSuccess: (rental) => {
-      localStorage.setItem('odo-email', rental.customer.email)
       qc.invalidateQueries({ queryKey: ['cars'] })
       qc.invalidateQueries({ queryKey: ['car'] })
+      qc.invalidateQueries({ queryKey: ['my-bookings'] })
+      toast.success(`Booking confirmed (${rental.vehicle.name})`)
       navigate(`/bookings/${rental.id}`)
     },
     onError: (e) => toast.error(isApiError(e) ? e.message : 'Something went wrong. Try again.'),
+  })
+
+  const adminUpdate = useMutation({
+    mutationFn: () =>
+      api.updateVehicle(Number(id), {
+        name: editName.trim(),
+        dailyRate: Number(editRate),
+        available: editAvail,
+        category: { id: Number(editCatId) },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cars'] })
+      qc.invalidateQueries({ queryKey: ['car', Number(id)] })
+      toast.success('Vehicle updated.')
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not update vehicle.'),
   })
 
   if (car.isLoading) {
@@ -97,7 +108,7 @@ export default function CarDetail() {
 
   const c = car.data
   const catPct = Number(c.category.discountPercent) || 0
-  const coupon = coupons.data?.find((x) => x.code.toUpperCase() === couponCode)
+  const coupon = coupons.data?.find((x) => x.code.toUpperCase() === couponCode.trim().toUpperCase())
   const pct = benefit === 'CATEGORY_DISCOUNT' ? catPct : benefit === 'COUPON' && coupon ? Number(coupon.discountPercent) : 0
   const gross = c.pricePerDay * days
   const total = gross - (gross * pct) / 100
@@ -113,7 +124,7 @@ export default function CarDetail() {
   const selectBenefit = (next: BenefitType) => {
     setBenefit(next)
     if (next === 'COUPON' && !couponCode && coupons.data?.length) {
-      setValue('couponCode', coupons.data[0].code, { shouldValidate: true })
+      setCouponCode(coupons.data[0].code)
     }
   }
 
@@ -149,7 +160,7 @@ export default function CarDetail() {
           </dl>
         </div>
 
-        {/* Right: booking panel */}
+        {/* Right: Role-specific panel (Customer booking vs Admin vehicle control) */}
         <div className="lg:col-span-5">
           <div className="lg:sticky lg:top-20">
             <p className="mono-label text-muted-foreground">{c.make}</p>
@@ -159,157 +170,207 @@ export default function CarDetail() {
               <StatusPill status={c.available ? 'available' : 'out'} />
             </div>
 
-            <form onSubmit={handleSubmit((f) => book.mutate(f))} className="mt-8 space-y-8 border-t border-hairline pt-8" noValidate>
-              {/* Trip */}
-              <fieldset>
-                <legend className="mono-label text-muted-foreground">Trip duration & dates</legend>
-                <div className="mt-3 grid grid-cols-1 border border-hairline bg-card sm:grid-cols-2">
-                  <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-b-0 sm:border-r">
-                    <span className="mono-label text-muted-foreground">Duration (days)</span>
+            {isAdmin ? (
+              <div className="mt-8 space-y-6 border-t border-hairline pt-8">
+                <div className="flex items-center justify-between border border-hairline bg-card px-4 py-3">
+                  <div>
+                    <p className="mono-label text-red-deep">ROLE · ADMIN</p>
+                    <p className="text-sm font-medium">Fleet Management Controls</p>
+                  </div>
+                  <Button asChild variant="secondary" className="min-h-9 px-3 text-xs">
+                    <Link to="/admin">Open Admin Console →</Link>
+                  </Button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    adminUpdate.mutate()
+                  }}
+                  className="ticks space-y-5 border border-hairline bg-card p-6"
+                >
+                  <p className="mono-label text-muted-foreground">Quick-edit vehicle (#{c.id})</p>
+                  <Input label="Vehicle name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <Input
+                    label="Daily rate (₹)"
+                    type="number"
+                    min={1}
+                    value={editRate}
+                    onChange={(e) => setEditRate(Number(e.target.value))}
+                  />
+                  <label className="block">
+                    <span className="mono-label text-muted-foreground">Category</span>
                     <select
-                      value={days}
-                      onChange={(e) => setDays(clampDays(Number(e.target.value)))}
-                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                      value={editCatId}
+                      onChange={(e) => setEditCatId(Number(e.target.value))}
+                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
                     >
-                      {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
-                        <option key={d} value={d} className="bg-card text-ink">
-                          {d} {d === 1 ? 'day' : 'days'} — {formatINR(c.pricePerDay * d)}
+                      {categories.data?.map((cat) => (
+                        <option key={cat.id} value={cat.id} className="bg-card text-ink">
+                          {cat.name} ({Number(cat.discountPercent)}% discount)
                         </option>
                       ))}
                     </select>
-                    <span className="mono-label mt-2 text-muted-foreground">Pick-up: Today ({prettyDate(today())})</span>
                   </label>
-
-                  <label className="flex flex-col justify-between p-4">
-                    <span className="mono-label text-muted-foreground">Return date</span>
+                  <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline px-4">
+                    <span className="text-sm font-medium">Available on the lot</span>
                     <input
-                      type="date"
-                      value={returnDateFor(days)}
-                      min={returnDateFor(1)}
-                      max={returnDateFor(MAX_DAYS)}
-                      onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value)))}
-                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                      type="checkbox"
+                      checked={editAvail}
+                      onChange={(e) => setEditAvail(e.target.checked)}
+                      className="size-5 accent-[var(--odo-signal)]"
                     />
-                    <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days))}</span>
                   </label>
-                </div>
-              </fieldset>
+                  <Button type="submit" arrow className="w-full" disabled={adminUpdate.isPending}>
+                    {adminUpdate.isPending ? 'Saving changes…' : 'Save vehicle changes'}
+                  </Button>
+                </form>
 
-              {/* Offer */}
-              <fieldset>
-                <legend className="mono-label text-muted-foreground">Offer · one per rental</legend>
+                <p className="mono-label text-muted-foreground">
+                  Note: Creating customer bookings (POST /api/rentals) requires a CUSTOMER account. Sign in as a customer to place a reservation.
+                </p>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  book.mutate()
+                }}
+                className="mt-8 space-y-8 border-t border-hairline pt-8"
+                noValidate
+              >
+                {/* Authenticated Customer Identity Readout */}
+                {user && isCustomer && (
+                  <div className="flex items-center justify-between border border-hairline bg-card px-4 py-3">
+                    <div>
+                      <p className="mono-label text-muted-foreground">Authenticated Driver · {user.role}</p>
+                      <p className="font-medium text-ink">{user.name}</p>
+                      <p className="mono text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                    <span className="mono-label border border-hairline px-2 py-1 text-pit">Verified JWT</span>
+                  </div>
+                )}
 
-                <label className="mt-3 block">
-                  <span className="sr-only">Select offer type</span>
-                  <select
-                    value={benefit}
-                    onChange={(e) => selectBenefit(e.target.value as BenefitType)}
-                    className="w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
-                  >
-                    {benefits.map((b) => (
-                      <option key={b.v} value={b.v} disabled={b.disabled} className="bg-card text-ink">
-                        {b.label} — {b.note}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="mt-3 grid grid-cols-2 items-stretch gap-2">
-                  {benefits.map((b) => (
-                    <button
-                      key={b.v}
-                      type="button"
-                      disabled={b.disabled}
-                      onClick={() => selectBenefit(b.v)}
-                      aria-pressed={benefit === b.v}
-                      className={cn(
-                        'flex h-full flex-col justify-between border p-3 text-left transition-colors duration-200',
-                        benefit === b.v ? 'border-ink bg-ink text-paper' : 'border-hairline bg-card text-ink hover:border-ink',
-                        b.disabled && 'pointer-events-none opacity-40',
-                      )}
-                    >
-                      <span className="block text-sm font-medium">{b.label}</span>
-                      <span className="mt-1 block text-xs opacity-75">{b.note}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {benefit === 'COUPON' && (
-                  <div className="mt-4 space-y-4 border border-hairline bg-card p-4">
-                    <label className="block">
-                      <span className="mono-label text-muted-foreground">Choose an available coupon</span>
+                {/* Trip */}
+                <fieldset>
+                  <legend className="mono-label text-muted-foreground">Trip duration & dates</legend>
+                  <div className="mt-3 grid grid-cols-1 border border-hairline bg-card sm:grid-cols-2">
+                    <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-b-0 sm:border-r">
+                      <span className="mono-label text-muted-foreground">Duration (days)</span>
                       <select
-                        value={coupon?.code ?? ''}
-                        onChange={(e) => setValue('couponCode', e.target.value, { shouldValidate: true })}
-                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                        value={days}
+                        onChange={(e) => setDays(clampDays(Number(e.target.value)))}
+                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
                       >
-                        <option value="" className="bg-card text-ink">— Select a coupon code —</option>
-                        {coupons.data?.map((cp) => (
-                          <option key={cp.id} value={cp.code} className="bg-card text-ink">
-                            {cp.code} · {couponDescription(cp)}
+                        {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+                          <option key={d} value={d} className="bg-card text-ink">
+                            {d} {d === 1 ? 'day' : 'days'} — {formatINR(c.pricePerDay * d)}
                           </option>
                         ))}
                       </select>
+                      <span className="mono-label mt-2 text-muted-foreground">Pick-up: Today ({prettyDate(today())})</span>
                     </label>
-                    <Input label="Or type coupon code" placeholder="e.g. WELCOME50" {...register('couponCode')} />
-                  </div>
-                )}
-              </fieldset>
 
-              {/* Driver */}
-              <fieldset className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <legend className="mono-label text-muted-foreground">Driver details</legend>
-                  {customers.data && customers.data.length > 0 && (
+                    <label className="flex flex-col justify-between p-4">
+                      <span className="mono-label text-muted-foreground">Return date</span>
+                      <input
+                        type="date"
+                        value={returnDateFor(days)}
+                        min={returnDateFor(1)}
+                        max={returnDateFor(MAX_DAYS)}
+                        onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value)))}
+                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                      />
+                      <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days))}</span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                {/* Offer */}
+                <fieldset>
+                  <legend className="mono-label text-muted-foreground">Offer · one per rental</legend>
+
+                  <label className="mt-3 block">
+                    <span className="sr-only">Select offer type</span>
                     <select
-                      aria-label="Fill with existing customer"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const found = customers.data?.find((x) => String(x.id) === e.target.value)
-                        if (found) {
-                          setValue('name', found.name, { shouldValidate: true })
-                          setValue('email', found.email, { shouldValidate: true })
-                          setValue('phone', found.phone ?? '', { shouldValidate: true })
-                          setValue('employeeId', found.employeeId ?? '', { shouldValidate: true })
-                        }
-                      }}
-                      className="max-w-56 cursor-pointer border border-hairline bg-card px-2 py-1 text-xs text-ink outline-none focus:border-signal"
+                      value={benefit}
+                      onChange={(e) => selectBenefit(e.target.value as BenefitType)}
+                      className="w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
                     >
-                      <option value="" className="bg-card text-ink">Quick-fill returning customer…</option>
-                      {customers.data.slice(0, 40).map((cust) => (
-                        <option key={cust.id} value={String(cust.id)} className="bg-card text-ink">
-                          {cust.name} {cust.employeeId ? `(${cust.employeeId})` : ''}
+                      {benefits.map((b) => (
+                        <option key={b.v} value={b.v} disabled={b.disabled} className="bg-card text-ink">
+                          {b.label} — {b.note}
                         </option>
                       ))}
                     </select>
+                  </label>
+
+                  <div className="mt-3 grid grid-cols-2 items-stretch gap-2">
+                    {benefits.map((b) => (
+                      <button
+                        key={b.v}
+                        type="button"
+                        disabled={b.disabled}
+                        onClick={() => selectBenefit(b.v)}
+                        aria-pressed={benefit === b.v}
+                        className={cn(
+                          'flex h-full flex-col justify-between border p-3 text-left transition-colors duration-200',
+                          benefit === b.v ? 'border-ink bg-ink text-paper' : 'border-hairline bg-card text-ink hover:border-ink',
+                          b.disabled && 'pointer-events-none opacity-40',
+                        )}
+                      >
+                        <span className="block text-sm font-medium">{b.label}</span>
+                        <span className="mt-1 block text-xs opacity-75">{b.note}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {benefit === 'COUPON' && (
+                    <div className="mt-4 space-y-4 border border-hairline bg-card p-4">
+                      <label className="block">
+                        <span className="mono-label text-muted-foreground">Choose an available coupon</span>
+                        <select
+                          value={coupon?.code ?? ''}
+                          onChange={(e) => setCouponCode(e.target.value)}
+                          className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                        >
+                          <option value="" className="bg-card text-ink">— Select a coupon code —</option>
+                          {coupons.data?.map((cp) => (
+                            <option key={cp.id} value={cp.code} className="bg-card text-ink">
+                              {cp.code} · {couponDescription(cp)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <Input
+                        label="Or type coupon code"
+                        placeholder="e.g. WELCOME50"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                      />
+                    </div>
                   )}
-                </div>
-                <Input label="Full name" autoComplete="name" error={errors.name?.message} {...register('name')} />
-                <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register('email')} />
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <Input label="Phone (optional)" type="tel" autoComplete="tel" error={errors.phone?.message} {...register('phone')} />
-                  <Input label="Employee ID (optional)" placeholder="MSN…" {...register('employeeId')} />
-                </div>
-              </fieldset>
+                </fieldset>
 
-              {/* Receipt */}
-              <div className="border border-dashed border-hairline bg-card p-5">
-                <dl className="mono space-y-2 text-sm">
-                  <div className="flex gap-2"><dt>{formatINR(c.pricePerDay)} × {days} {days === 1 ? 'day' : 'days'}</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>{formatINR(gross)}</dd></div>
-                  {pct > 0 && <div className="flex gap-2 text-red-deep"><dt>Discount {pct}%</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>− {formatINR(gross - total)}</dd></div>}
-                  <div className="flex gap-2 text-muted-foreground"><dt>Taxes</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>Included</dd></div>
-                </dl>
-                <div className="mt-4 flex items-end justify-between border-t border-hairline pt-4">
-                  <span className="mono-label">Estimated total</span>
-                  <Counter value={total} prefix="₹ " className="text-3xl font-medium" />
+                {/* Receipt */}
+                <div className="border border-dashed border-hairline bg-card p-5">
+                  <dl className="mono space-y-2 text-sm">
+                    <div className="flex gap-2"><dt>{formatINR(c.pricePerDay)} × {days} {days === 1 ? 'day' : 'days'}</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>{formatINR(gross)}</dd></div>
+                    {pct > 0 && <div className="flex gap-2 text-red-deep"><dt>Discount {pct}%</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>− {formatINR(gross - total)}</dd></div>}
+                    <div className="flex gap-2 text-muted-foreground"><dt>Taxes</dt><span className="flex-1 border-b border-dotted border-hairline" /><dd>Included</dd></div>
+                  </dl>
+                  <div className="mt-4 flex items-end justify-between border-t border-hairline pt-4">
+                    <span className="mono-label">Estimated total</span>
+                    <Counter value={total} prefix="₹ " className="text-3xl font-medium" />
+                  </div>
+                  {benefit === 'COUPON' && couponCode && !coupon && <p className="mt-2 text-xs text-muted-foreground">Code not recognised yet. The server checks it when you confirm.</p>}
                 </div>
-                {benefit === 'COUPON' && couponCode && !coupon && <p className="mt-2 text-xs text-muted-foreground">Code not recognised yet. The server checks it when you confirm.</p>}
-              </div>
 
-              <Button type="submit" arrow className="w-full min-h-14" disabled={!c.available || book.isPending}>
-                {book.isPending ? 'Printing your agreement…' : c.available ? 'Reserve this car' : 'Out on the road'}
-              </Button>
-            </form>
+                <Button type="submit" arrow className="min-h-14 w-full" disabled={!c.available || book.isPending}>
+                  {book.isPending ? 'Printing your agreement…' : c.available ? 'Reserve this car' : 'Out on the road'}
+                </Button>
+              </form>
+            )}
           </div>
         </div>
       </div>
