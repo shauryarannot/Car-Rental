@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -11,8 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { prettyDate } from '@/lib/trip'
-import { cn, formatINR } from '@/lib/utils'
-import { bookingRef } from './Ticket'
+import { bookingRef, cn, formatINR } from '@/lib/utils'
 
 type Tab = 'ACTIVE' | 'COMPLETED'
 
@@ -48,6 +47,16 @@ export default function MyBookings() {
     },
   })
 
+  const counts = useMemo(() => {
+    const all = q.data ?? []
+    return {
+      ACTIVE: all.filter((r) => r.status === 'ACTIVE').length,
+      COMPLETED: all.filter((r) => r.status === 'COMPLETED').length,
+    }
+  }, [q.data])
+
+  const list = useMemo(() => (q.data ?? []).filter((r) => r.status === tab), [q.data, tab])
+
   if (isAdmin) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-24">
@@ -63,12 +72,6 @@ export default function MyBookings() {
         </Button>
       </div>
     )
-  }
-
-  const list = (q.data ?? []).filter((r) => r.status === tab)
-  const counts = {
-    ACTIVE: q.data?.filter((r) => r.status === 'ACTIVE').length ?? 0,
-    COMPLETED: q.data?.filter((r) => r.status === 'COMPLETED').length ?? 0,
   }
 
   return (

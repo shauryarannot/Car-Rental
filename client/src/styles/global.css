@@ -125,9 +125,6 @@
 @keyframes odo-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 .skeleton { background: var(--odo-surface-alt); animation: odo-pulse 1.4s var(--ease) infinite; }
 
-/* Route wipe */
-@keyframes odo-grain-shift { to { transform: translate(-3%, -3%); } }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
@@ -136,4 +133,3 @@
   header, footer, .no-print, .grain { display: none !important; }
   body { background: #fff; color: #000; }
 }
-

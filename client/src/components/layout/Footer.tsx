@@ -26,8 +26,8 @@ export function Footer() {
           <span>Motherson Fleet Operations</span>
         </address>
       </div>
-      <p aria-hidden className="wordmark select-none whitespace-nowrap pt-10 text-center text-[20vw] leading-[0.95] text-ink">
-        Ryd.exe
+      <p aria-hidden className="wordmark select-none whitespace-nowrap px-4 pb-4 pt-10 text-center text-[15vw] leading-none text-ink">
+        Ryde.exe
       </p>
     </footer>
   )

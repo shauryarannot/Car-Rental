@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
-import { api, isApiError, type BenefitType, type DiscountCoupon } from '@/api'
+import { api, isApiError, type BenefitType, type Car, type Category, type DiscountCoupon } from '@/api'
 import { useAuth } from '@/app/auth'
 import { useCar, useCars, useCategories, useCoupons } from '@/hooks/queries'
 import { CarImage } from '@/components/car/CarImage'
@@ -22,6 +22,76 @@ function couponDescription(c: DiscountCoupon) {
   return `${Number(c.discountPercent)}% off — Trips of ${c.minDays} to ${c.maxDays} days`
 }
 
+function AdminVehicleQuickEdit({ car, categories }: { car: Car; categories?: Category[] }) {
+  const qc = useQueryClient()
+  const [editName, setEditName] = useState(car.name)
+  const [editRate, setEditRate] = useState(car.pricePerDay)
+  const [editCatId, setEditCatId] = useState(car.category.id)
+  const [editAvail, setEditAvail] = useState(car.available)
+
+  const adminUpdate = useMutation({
+    mutationFn: () =>
+      api.updateVehicle(car.id, {
+        name: editName.trim(),
+        dailyRate: Number(editRate),
+        available: editAvail,
+        category: { id: Number(editCatId) },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cars'] })
+      qc.invalidateQueries({ queryKey: ['car', car.id] })
+      toast.success('Vehicle updated.')
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not update vehicle.'),
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        adminUpdate.mutate()
+      }}
+      className="ticks space-y-5 border border-hairline bg-card p-6"
+    >
+      <p className="mono-label text-muted-foreground">Quick-edit vehicle (#{car.id})</p>
+      <Input label="Vehicle name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+      <Input
+        label="Daily rate (₹)"
+        type="number"
+        min={1}
+        value={editRate}
+        onChange={(e) => setEditRate(Number(e.target.value))}
+      />
+      <label className="block">
+        <span className="mono-label text-muted-foreground">Category</span>
+        <select
+          value={editCatId}
+          onChange={(e) => setEditCatId(Number(e.target.value))}
+          className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+        >
+          {categories?.map((cat) => (
+            <option key={cat.id} value={cat.id} className="bg-card text-ink">
+              {cat.name} ({Number(cat.discountPercent)}% discount)
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline px-4">
+        <span className="text-sm font-medium">Available on the lot</span>
+        <input
+          type="checkbox"
+          checked={editAvail}
+          onChange={(e) => setEditAvail(e.target.checked)}
+          className="size-5 accent-[var(--odo-signal)]"
+        />
+      </label>
+      <Button type="submit" arrow className="w-full" disabled={adminUpdate.isPending}>
+        {adminUpdate.isPending ? 'Saving changes…' : 'Save vehicle changes'}
+      </Button>
+    </form>
+  )
+}
+
 export default function CarDetail() {
   const { id } = useParams()
   const [params] = useSearchParams()
@@ -36,21 +106,6 @@ export default function CarDetail() {
   const [days, setDays] = useState(clampDays(Number(params.get('days') ?? 2)))
   const [benefit, setBenefit] = useState<BenefitType>('NONE')
   const [couponCode, setCouponCode] = useState('')
-
-  // Admin inline vehicle editor state
-  const [editName, setEditName] = useState('')
-  const [editRate, setEditRate] = useState(0)
-  const [editCatId, setEditCatId] = useState(1)
-  const [editAvail, setEditAvail] = useState(true)
-
-  useEffect(() => {
-    if (car.data) {
-      setEditName(car.data.name)
-      setEditRate(car.data.pricePerDay)
-      setEditCatId(car.data.category.id)
-      setEditAvail(car.data.available)
-    }
-  }, [car.data])
 
   const book = useMutation({
     mutationFn: () =>
@@ -69,22 +124,6 @@ export default function CarDetail() {
       navigate(`/bookings/${rental.id}`)
     },
     onError: (e) => toast.error(isApiError(e) ? e.message : 'Something went wrong. Try again.'),
-  })
-
-  const adminUpdate = useMutation({
-    mutationFn: () =>
-      api.updateVehicle(Number(id), {
-        name: editName.trim(),
-        dailyRate: Number(editRate),
-        available: editAvail,
-        category: { id: Number(editCatId) },
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['cars'] })
-      qc.invalidateQueries({ queryKey: ['car', Number(id)] })
-      toast.success('Vehicle updated.')
-    },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not update vehicle.'),
   })
 
   if (car.isLoading) {
@@ -182,49 +221,7 @@ export default function CarDetail() {
                   </Button>
                 </div>
 
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    adminUpdate.mutate()
-                  }}
-                  className="ticks space-y-5 border border-hairline bg-card p-6"
-                >
-                  <p className="mono-label text-muted-foreground">Quick-edit vehicle (#{c.id})</p>
-                  <Input label="Vehicle name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                  <Input
-                    label="Daily rate (₹)"
-                    type="number"
-                    min={1}
-                    value={editRate}
-                    onChange={(e) => setEditRate(Number(e.target.value))}
-                  />
-                  <label className="block">
-                    <span className="mono-label text-muted-foreground">Category</span>
-                    <select
-                      value={editCatId}
-                      onChange={(e) => setEditCatId(Number(e.target.value))}
-                      className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
-                    >
-                      {categories.data?.map((cat) => (
-                        <option key={cat.id} value={cat.id} className="bg-card text-ink">
-                          {cat.name} ({Number(cat.discountPercent)}% discount)
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline px-4">
-                    <span className="text-sm font-medium">Available on the lot</span>
-                    <input
-                      type="checkbox"
-                      checked={editAvail}
-                      onChange={(e) => setEditAvail(e.target.checked)}
-                      className="size-5 accent-[var(--odo-signal)]"
-                    />
-                  </label>
-                  <Button type="submit" arrow className="w-full" disabled={adminUpdate.isPending}>
-                    {adminUpdate.isPending ? 'Saving changes…' : 'Save vehicle changes'}
-                  </Button>
-                </form>
+                <AdminVehicleQuickEdit key={`${c.id}-${c.name}-${c.pricePerDay}-${c.category.id}-${c.available}`} car={c} categories={categories.data} />
 
                 <p className="mono-label text-muted-foreground">
                   Note: Creating customer bookings (POST /api/rentals) requires a CUSTOMER account. Sign in as a customer to place a reservation.

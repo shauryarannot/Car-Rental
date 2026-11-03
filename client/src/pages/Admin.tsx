@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -19,10 +19,45 @@ import { Input } from '@/components/ui/input'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
 import { prettyDate } from '@/lib/trip'
-import { cn, formatINR } from '@/lib/utils'
-import { bookingRef } from './Ticket'
+import { bookingRef, cn, formatINR } from '@/lib/utils'
 
 type AdminTab = 'fleet' | 'rentals' | 'categories' | 'coupons' | 'customers'
+
+function SlideOver({
+  open,
+  onClose,
+  maxWidth = 'max-w-md',
+  children,
+}: {
+  open: boolean
+  onClose: () => void
+  maxWidth?: string
+  children: ReactNode
+}) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <div className="absolute inset-0 bg-ink/50" onClick={onClose} />
+          <motion.div
+            role="dialog"
+            aria-modal
+            className={cn(
+              'relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8',
+              maxWidth,
+            )}
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
 
 export default function Admin() {
   const { user, isAdmin } = useAuth()
@@ -515,7 +550,7 @@ export default function Admin() {
               type="search"
               value={rentalSearch}
               onChange={(e) => setRentalSearch(e.target.value)}
-              placeholder="Search by customer, vehicle, or reference (ODO-…)…"
+              placeholder="Search by customer, vehicle, or reference (Ryde.exe-…)…"
               className="min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal sm:max-w-md"
             />
             <span className="mono-label ml-auto text-muted-foreground">Showing {Math.min(filteredRentals.length, 150)} of {filteredRentals.length}</span>
@@ -822,381 +857,317 @@ export default function Admin() {
       )}
 
       {/* SLIDE-OVER SHEET: VEHICLE CREATE / EDIT */}
-      <AnimatePresence>
+      <SlideOver open={!!vehicleModal} onClose={() => setVehicleModal(null)}>
         {vehicleModal && (
-          <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-ink/50" onClick={() => setVehicleModal(null)} />
-            <motion.div
-              role="dialog"
-              aria-modal
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  saveVehicle.mutate(vehicleModal)
-                }}
-                className="space-y-6"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveVehicle.mutate(vehicleModal)
+            }}
+            className="space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <p className="mono-label">{vehicleModal.id ? `Edit Vehicle #${vehicleModal.id}` : 'Create Vehicle'}</p>
+              <button type="button" className="mono-label" onClick={() => setVehicleModal(null)}>
+                Close
+              </button>
+            </div>
+
+            <Input
+              label="Make & Model (e.g. Honda City)"
+              value={vehicleModal.name}
+              onChange={(e) => setVehicleModal({ ...vehicleModal, name: e.target.value })}
+              required
+            />
+
+            <Input
+              label="Daily Rate (₹)"
+              type="number"
+              min={1}
+              value={vehicleModal.dailyRate}
+              onChange={(e) => setVehicleModal({ ...vehicleModal, dailyRate: Number(e.target.value) })}
+              required
+            />
+
+            <label className="block">
+              <span className="mono-label text-muted-foreground">Category</span>
+              <select
+                value={vehicleModal.categoryId}
+                onChange={(e) => setVehicleModal({ ...vehicleModal, categoryId: Number(e.target.value) })}
+                className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
               >
-                <div className="flex items-center justify-between border-b border-hairline pb-4">
-                  <p className="mono-label">{vehicleModal.id ? `Edit Vehicle #${vehicleModal.id}` : 'Create Vehicle'}</p>
-                  <button type="button" className="mono-label" onClick={() => setVehicleModal(null)}>
-                    Close
-                  </button>
-                </div>
+                {categories.data?.map((cat) => (
+                  <option key={cat.id} value={cat.id} className="bg-card text-ink">
+                    {cat.name} ({Number(cat.discountPercent)}% discount)
+                  </option>
+                ))}
+              </select>
+            </label>
 
-                <Input
-                  label="Make & Model (e.g. Honda City)"
-                  value={vehicleModal.name}
-                  onChange={(e) => setVehicleModal({ ...vehicleModal, name: e.target.value })}
-                  required
-                />
+            <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline bg-card px-4">
+              <span className="text-sm font-medium">Available for rent</span>
+              <input
+                type="checkbox"
+                checked={vehicleModal.available}
+                onChange={(e) => setVehicleModal({ ...vehicleModal, available: e.target.checked })}
+                className="size-5 accent-[var(--odo-signal)]"
+              />
+            </label>
 
-                <Input
-                  label="Daily Rate (₹)"
-                  type="number"
-                  min={1}
-                  value={vehicleModal.dailyRate}
-                  onChange={(e) => setVehicleModal({ ...vehicleModal, dailyRate: Number(e.target.value) })}
-                  required
-                />
-
-                <label className="block">
-                  <span className="mono-label text-muted-foreground">Category</span>
-                  <select
-                    value={vehicleModal.categoryId}
-                    onChange={(e) => setVehicleModal({ ...vehicleModal, categoryId: Number(e.target.value) })}
-                    className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
-                  >
-                    {categories.data?.map((cat) => (
-                      <option key={cat.id} value={cat.id} className="bg-card text-ink">
-                        {cat.name} ({Number(cat.discountPercent)}% discount)
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline bg-card px-4">
-                  <span className="text-sm font-medium">Available for rent</span>
-                  <input
-                    type="checkbox"
-                    checked={vehicleModal.available}
-                    onChange={(e) => setVehicleModal({ ...vehicleModal, available: e.target.checked })}
-                    className="size-5 accent-[var(--odo-signal)]"
-                  />
-                </label>
-
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setVehicleModal(null)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={saveVehicle.isPending}>
-                    {saveVehicle.isPending ? 'Saving…' : 'Save Vehicle'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setVehicleModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={saveVehicle.isPending}>
+                {saveVehicle.isPending ? 'Saving…' : 'Save Vehicle'}
+              </Button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
+      </SlideOver>
 
       {/* SLIDE-OVER SHEET: CATEGORY CREATE / EDIT */}
-      <AnimatePresence>
+      <SlideOver open={!!categoryModal} onClose={() => setCategoryModal(null)}>
         {categoryModal && (
-          <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-ink/50" onClick={() => setCategoryModal(null)} />
-            <motion.div
-              role="dialog"
-              aria-modal
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  saveCategory.mutate(categoryModal)
-                }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between border-b border-hairline pb-4">
-                  <p className="mono-label">{categoryModal.id ? `Edit Category #${categoryModal.id}` : 'Create Category'}</p>
-                  <button type="button" className="mono-label" onClick={() => setCategoryModal(null)}>
-                    Close
-                  </button>
-                </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveCategory.mutate(categoryModal)
+            }}
+            className="space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <p className="mono-label">{categoryModal.id ? `Edit Category #${categoryModal.id}` : 'Create Category'}</p>
+              <button type="button" className="mono-label" onClick={() => setCategoryModal(null)}>
+                Close
+              </button>
+            </div>
 
-                <Input
-                  label="Category Name"
-                  value={categoryModal.name}
-                  onChange={(e) => setCategoryModal({ ...categoryModal, name: e.target.value })}
-                  required
-                />
+            <Input
+              label="Category Name"
+              value={categoryModal.name}
+              onChange={(e) => setCategoryModal({ ...categoryModal, name: e.target.value })}
+              required
+            />
 
-                <Input
-                  label="Category Discount % (0 to 50)"
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={categoryModal.discountPercent}
-                  onChange={(e) => setCategoryModal({ ...categoryModal, discountPercent: Number(e.target.value) })}
-                  required
-                />
+            <Input
+              label="Category Discount % (0 to 50)"
+              type="number"
+              min={0}
+              max={50}
+              value={categoryModal.discountPercent}
+              onChange={(e) => setCategoryModal({ ...categoryModal, discountPercent: Number(e.target.value) })}
+              required
+            />
 
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setCategoryModal(null)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={saveCategory.isPending}>
-                    {saveCategory.isPending ? 'Saving…' : 'Save Category'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCategoryModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={saveCategory.isPending}>
+                {saveCategory.isPending ? 'Saving…' : 'Save Category'}
+              </Button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
+      </SlideOver>
 
       {/* SLIDE-OVER SHEET: COUPON CREATE / EDIT */}
-      <AnimatePresence>
+      <SlideOver open={!!couponModal} onClose={() => setCouponModal(null)}>
         {couponModal && (
-          <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-ink/50" onClick={() => setCouponModal(null)} />
-            <motion.div
-              role="dialog"
-              aria-modal
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  saveCoupon.mutate(couponModal)
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveCoupon.mutate(couponModal)
+            }}
+            className="space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <p className="mono-label">{couponModal.id ? `Edit Coupon #${couponModal.id}` : 'Create Coupon'}</p>
+              <button type="button" className="mono-label" onClick={() => setCouponModal(null)}>
+                Close
+              </button>
+            </div>
+
+            <Input
+              label="Coupon Code (uppercase)"
+              value={couponModal.code}
+              onChange={(e) => setCouponModal({ ...couponModal, code: e.target.value.toUpperCase() })}
+              required
+            />
+
+            <label className="block">
+              <span className="mono-label text-muted-foreground">Coupon Type</span>
+              <select
+                value={couponModal.couponType}
+                onChange={(e) => {
+                  const nextType = e.target.value as CouponType
+                  setCouponModal({
+                    ...couponModal,
+                    couponType: nextType,
+                    discountPercent: nextType === 'FIRST_RENTAL' ? 50 : couponModal.discountPercent,
+                  })
                 }}
-                className="space-y-6"
+                className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
               >
-                <div className="flex items-center justify-between border-b border-hairline pb-4">
-                  <p className="mono-label">{couponModal.id ? `Edit Coupon #${couponModal.id}` : 'Create Coupon'}</p>
-                  <button type="button" className="mono-label" onClick={() => setCouponModal(null)}>
-                    Close
-                  </button>
-                </div>
+                <option value="FIRST_RENTAL" className="bg-card text-ink">FIRST_RENTAL (Must be 50%)</option>
+                <option value="DURATION" className="bg-card text-ink">DURATION (Requires min & max days)</option>
+                <option value="EMPLOYEE" className="bg-card text-ink">EMPLOYEE (Motherson staff)</option>
+              </select>
+            </label>
 
+            <Input
+              label="Discount Percent (1 to 50)"
+              type="number"
+              min={1}
+              max={50}
+              disabled={couponModal.couponType === 'FIRST_RENTAL'}
+              value={couponModal.couponType === 'FIRST_RENTAL' ? 50 : couponModal.discountPercent}
+              onChange={(e) => setCouponModal({ ...couponModal, discountPercent: Number(e.target.value) })}
+              required
+            />
+
+            {couponModal.couponType === 'DURATION' && (
+              <div className="grid grid-cols-2 gap-4">
                 <Input
-                  label="Coupon Code (uppercase)"
-                  value={couponModal.code}
-                  onChange={(e) => setCouponModal({ ...couponModal, code: e.target.value.toUpperCase() })}
-                  required
-                />
-
-                <label className="block">
-                  <span className="mono-label text-muted-foreground">Coupon Type</span>
-                  <select
-                    value={couponModal.couponType}
-                    onChange={(e) => {
-                      const nextType = e.target.value as CouponType
-                      setCouponModal({
-                        ...couponModal,
-                        couponType: nextType,
-                        discountPercent: nextType === 'FIRST_RENTAL' ? 50 : couponModal.discountPercent,
-                      })
-                    }}
-                    className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
-                  >
-                    <option value="FIRST_RENTAL" className="bg-card text-ink">FIRST_RENTAL (Must be 50%)</option>
-                    <option value="DURATION" className="bg-card text-ink">DURATION (Requires min & max days)</option>
-                    <option value="EMPLOYEE" className="bg-card text-ink">EMPLOYEE (Motherson staff)</option>
-                  </select>
-                </label>
-
-                <Input
-                  label="Discount Percent (1 to 50)"
+                  label="Min Days (1–30)"
                   type="number"
                   min={1}
-                  max={50}
-                  disabled={couponModal.couponType === 'FIRST_RENTAL'}
-                  value={couponModal.couponType === 'FIRST_RENTAL' ? 50 : couponModal.discountPercent}
-                  onChange={(e) => setCouponModal({ ...couponModal, discountPercent: Number(e.target.value) })}
+                  max={30}
+                  value={couponModal.minDays}
+                  onChange={(e) => setCouponModal({ ...couponModal, minDays: e.target.value })}
                   required
                 />
+                <Input
+                  label="Max Days (1–30)"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={couponModal.maxDays}
+                  onChange={(e) => setCouponModal({ ...couponModal, maxDays: e.target.value })}
+                  required
+                />
+              </div>
+            )}
 
-                {couponModal.couponType === 'DURATION' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input
-                      label="Min Days (1–30)"
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={couponModal.minDays}
-                      onChange={(e) => setCouponModal({ ...couponModal, minDays: e.target.value })}
-                      required
-                    />
-                    <Input
-                      label="Max Days (1–30)"
-                      type="number"
-                      min={1}
-                      max={30}
-                      value={couponModal.maxDays}
-                      onChange={(e) => setCouponModal({ ...couponModal, maxDays: e.target.value })}
-                      required
-                    />
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setCouponModal(null)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={saveCoupon.isPending}>
-                    {saveCoupon.isPending ? 'Saving…' : 'Save Coupon'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCouponModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={saveCoupon.isPending}>
+                {saveCoupon.isPending ? 'Saving…' : 'Save Coupon'}
+              </Button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
+      </SlideOver>
 
       {/* SLIDE-OVER SHEET: CUSTOMER CREATE / EDIT */}
-      <AnimatePresence>
+      <SlideOver open={!!customerModal} onClose={() => setCustomerModal(null)}>
         {customerModal && (
-          <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-ink/50" onClick={() => setCustomerModal(null)} />
-            <motion.div
-              role="dialog"
-              aria-modal
-              className="relative z-10 flex h-full w-full max-w-md flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  saveCustomer.mutate(customerModal)
-                }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between border-b border-hairline pb-4">
-                  <p className="mono-label">{customerModal.id ? `Edit Customer #${customerModal.id}` : 'Create Customer'}</p>
-                  <button type="button" className="mono-label" onClick={() => setCustomerModal(null)}>
-                    Close
-                  </button>
-                </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              saveCustomer.mutate(customerModal)
+            }}
+            className="space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <p className="mono-label">{customerModal.id ? `Edit Customer #${customerModal.id}` : 'Create Customer'}</p>
+              <button type="button" className="mono-label" onClick={() => setCustomerModal(null)}>
+                Close
+              </button>
+            </div>
 
-                <Input
-                  label="Full Name"
-                  value={customerModal.name}
-                  onChange={(e) => setCustomerModal({ ...customerModal, name: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Email Address"
-                  type="email"
-                  value={customerModal.email}
-                  onChange={(e) => setCustomerModal({ ...customerModal, email: e.target.value })}
-                  required
-                />
-                <Input
-                  label="Phone"
-                  value={customerModal.phone}
-                  onChange={(e) => setCustomerModal({ ...customerModal, phone: e.target.value })}
-                />
-                <Input
-                  label="Motherson Employee ID (optional)"
-                  placeholder="MSN…"
-                  value={customerModal.employeeId}
-                  onChange={(e) => setCustomerModal({ ...customerModal, employeeId: e.target.value })}
-                />
+            <Input
+              label="Full Name"
+              value={customerModal.name}
+              onChange={(e) => setCustomerModal({ ...customerModal, name: e.target.value })}
+              required
+            />
+            <Input
+              label="Email Address"
+              type="email"
+              value={customerModal.email}
+              onChange={(e) => setCustomerModal({ ...customerModal, email: e.target.value })}
+              required
+            />
+            <Input
+              label="Phone"
+              value={customerModal.phone}
+              onChange={(e) => setCustomerModal({ ...customerModal, phone: e.target.value })}
+            />
+            <Input
+              label="Motherson Employee ID (optional)"
+              placeholder="MSN…"
+              value={customerModal.employeeId}
+              onChange={(e) => setCustomerModal({ ...customerModal, employeeId: e.target.value })}
+            />
 
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setCustomerModal(null)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="flex-1" disabled={saveCustomer.isPending}>
-                    {saveCustomer.isPending ? 'Saving…' : 'Save Customer'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCustomerModal(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={saveCustomer.isPending}>
+                {saveCustomer.isPending ? 'Saving…' : 'Save Customer'}
+              </Button>
+            </div>
+          </form>
         )}
-      </AnimatePresence>
+      </SlideOver>
 
       {/* SLIDE-OVER SHEET: CUSTOMER RENTAL HISTORY */}
-      <AnimatePresence>
+      <SlideOver open={!!historyCustomer} onClose={() => setHistoryCustomer(null)} maxWidth="max-w-lg">
         {historyCustomer && (
-          <motion.div className="fixed inset-0 z-[70] flex justify-end" data-lenis-prevent initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="absolute inset-0 bg-ink/50" onClick={() => setHistoryCustomer(null)} />
-            <motion.div
-              role="dialog"
-              aria-modal
-              className="relative z-10 flex h-full w-full max-w-lg flex-col overflow-y-auto border-l border-hairline bg-background p-8"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex items-center justify-between border-b border-hairline pb-4">
-                <div>
-                  <p className="mono-label text-muted-foreground">Customer Rental History</p>
-                  <p className="mt-1 text-lg font-semibold">{historyCustomer.name}</p>
-                  <p className="mono text-xs text-muted-foreground">{historyCustomer.email}</p>
-                </div>
-                <button type="button" className="mono-label" onClick={() => setHistoryCustomer(null)}>
-                  Close
-                </button>
+          <div>
+            <div className="flex items-center justify-between border-b border-hairline pb-4">
+              <div>
+                <p className="mono-label text-muted-foreground">Customer Rental History</p>
+                <p className="mt-1 text-lg font-semibold">{historyCustomer.name}</p>
+                <p className="mono text-xs text-muted-foreground">{historyCustomer.email}</p>
               </div>
+              <button type="button" className="mono-label" onClick={() => setHistoryCustomer(null)}>
+                Close
+              </button>
+            </div>
 
-              <div className="mt-6 space-y-3">
-                {customerHistoryQuery.isLoading && <p className="mono-label text-muted-foreground">Loading rentals…</p>}
-                {customerHistoryQuery.data?.length === 0 && (
-                  <p className="serif-italic text-2xl text-muted-foreground">No rentals recorded for this customer.</p>
-                )}
-                {customerHistoryQuery.data?.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between border border-hairline bg-card p-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Link to={`/bookings/${r.id}`} className="mono text-xs font-medium hover:underline">
-                          {bookingRef(r.id)}
-                        </Link>
-                        <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
-                      </div>
-                      <p className="mt-1 font-semibold">{r.vehicle.name}</p>
-                      <p className="mono-label mt-0.5 text-muted-foreground">
-                        {prettyDate(r.startDate)} → {prettyDate(r.endDate)} ({r.days}d)
-                      </p>
+            <div className="mt-6 space-y-3">
+              {customerHistoryQuery.isLoading && <p className="mono-label text-muted-foreground">Loading rentals…</p>}
+              {customerHistoryQuery.data?.length === 0 && (
+                <p className="serif-italic text-2xl text-muted-foreground">No rentals recorded for this customer.</p>
+              )}
+              {customerHistoryQuery.data?.map((r) => (
+                <div key={r.id} className="flex items-center justify-between border border-hairline bg-card p-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Link to={`/bookings/${r.id}`} className="mono text-xs font-medium hover:underline">
+                        {bookingRef(r.id)}
+                      </Link>
+                      <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
                     </div>
-                    <div className="text-right">
-                      <p className="mono font-medium">{formatINR(Number(r.totalAmount))}</p>
-                      {r.status === 'ACTIVE' && (
-                        <button
-                          type="button"
-                          onClick={() => returnRental.mutate(r.id)}
-                          className="mono-label mt-2 border border-ink px-2 py-1 text-[10px] hover:bg-ink hover:text-paper"
-                        >
-                          Return
-                        </button>
-                      )}
-                    </div>
+                    <p className="mt-1 font-semibold">{r.vehicle.name}</p>
+                    <p className="mono-label mt-0.5 text-muted-foreground">
+                      {prettyDate(r.startDate)} → {prettyDate(r.endDate)} ({r.days}d)
+                    </p>
                   </div>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
+                  <div className="text-right">
+                    <p className="mono font-medium">{formatINR(Number(r.totalAmount))}</p>
+                    {r.status === 'ACTIVE' && (
+                      <button
+                        type="button"
+                        onClick={() => returnRental.mutate(r.id)}
+                        className="mono-label mt-2 border border-ink px-2 py-1 text-[10px] hover:bg-ink hover:text-paper"
+                      >
+                        Return
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </SlideOver>
     </div>
   )
 }
-

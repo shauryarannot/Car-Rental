@@ -27,7 +27,7 @@ export function SmoothScroll({ children }: { children: ReactNode }) {
     })
     let timer: ReturnType<typeof setTimeout> | undefined
     lenis.on('scroll', () => {
-      setScrolling(true)
+      setScrolling((prev) => (prev ? prev : true))
       clearTimeout(timer)
       timer = setTimeout(() => setScrolling(false), 700)
     })

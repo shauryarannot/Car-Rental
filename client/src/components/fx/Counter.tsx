@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 
 const fmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 function Digit({ d }: { d: number }) {
   return (
@@ -11,7 +12,7 @@ function Digit({ d }: { d: number }) {
         className="absolute inset-x-0 top-0 flex flex-col transition-transform duration-[800ms] ease-odo"
         style={{ transform: `translateY(${-d}em)` }}
       >
-        {Array.from({ length: 10 }, (_, i) => (
+        {DIGITS.map((i) => (
           <span key={i} className="block h-[1em] text-center leading-none">{i}</span>
         ))}
       </span>
@@ -22,20 +23,24 @@ function Digit({ d }: { d: number }) {
 /** Odometer: digits roll on first view and whenever the value changes. en-IN grouping. */
 export function Counter({ value, prefix, suffix, className }: { value: number; prefix?: string; suffix?: string; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
-  const [shown, setShown] = useState(reduced() ? value : 0)
+  const [shown, setShown] = useState(() => (reduced() ? value : 0))
 
   useEffect(() => {
-    if (reduced()) { setShown(value); return }
+    if (reduced()) return
     const el = ref.current
     if (!el) return
     const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { setShown(value); io.disconnect() }
+      if (e.isIntersecting) {
+        setShown(value)
+        io.disconnect()
+      }
     })
     io.observe(el)
     return () => io.disconnect()
   }, [value])
 
-  const chars = fmt.format(Math.round(shown)).split('')
+  const displayValue = reduced() ? value : shown
+  const chars = fmt.format(Math.round(displayValue)).split('')
   return (
     <span ref={ref} className={cn('mono inline-flex items-end tabular-nums', className)} aria-label={`${prefix ?? ''}${fmt.format(value)}${suffix ?? ''}`}>
       <span aria-hidden className="inline-flex items-end">
@@ -46,4 +51,3 @@ export function Counter({ value, prefix, suffix, className }: { value: number; p
     </span>
   )
 }
-

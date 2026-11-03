@@ -1,5 +1,4 @@
-
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -7,7 +6,7 @@ import { SectionHeader } from '@/components/ui/section-header'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { useCars, useCategories, useCoupons } from '@/hooks/queries'
 import { MAX_DAYS, returnDateFor, daysUntil, clampDays, prettyDate } from '@/lib/trip'
-import { cn, formatINR } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
@@ -87,74 +86,78 @@ export default function Home() {
   const cars = useCars()
   const cats = useCategories()
   const coupons = useCoupons()
-  const available = cars.data?.filter((c) => c.available) ?? []
-  const featured = [...available].sort((a, b) => Number(!!b.imageUrl) - Number(!!a.imageUrl) || b.pricePerDay - a.pricePerDay).slice(0, 6)
+
+  const available = useMemo(() => cars.data?.filter((c) => c.available) ?? [], [cars.data])
+  const featured = useMemo(
+    () => [...available].sort((a, b) => Number(!!b.imageUrl) - Number(!!a.imageUrl) || b.pricePerDay - a.pricePerDay).slice(0, 6),
+    [available],
+  )
 
   return (
     <>
       {/* Hero */}
-    <section className="relative isolate overflow-hidden text-white">
-  <video
-    autoPlay
-    muted
-    loop
-    playsInline
-    preload="metadata"
-    className="absolute inset-0 -z-20 h-full w-full object-cover"
-  >
-    <source src="/videos/car_video.mp4" type="video/mp4" />
-  </video>
+      <section className="relative isolate overflow-hidden text-white">
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 -z-20 h-full w-full object-cover"
+        >
+          <source src="/videos/car_video.mp4" type="video/mp4" />
+        </video>
 
-  <div className="absolute inset-0 -z-10 bg-black/40" />
+        <div className="absolute inset-0 -z-10 bg-black/40" />
 
-  <div className="mx-auto grid max-w-[1440px] gap-10 px-6 pb-12 pt-16 lg:grid-cols-12 lg:pt-24">
-    <div className="lg:col-span-7">
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="mono-label"
-      >
-         {cars.data ? `${available.length} cars available today` : 'counting the lot'}
-      </motion.p>
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-6 pb-12 pt-16 lg:grid-cols-12 lg:pt-24">
+          <div className="lg:col-span-7">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8 }}
+              className="mono-label"
+            >
+              {cars.data ? `${available.length} cars available today` : 'counting the lot'}
+            </motion.p>
 
-      <h1 className="mt-6 text-[clamp(3rem,9vw,8.5rem)] font-extrabold leading-[0.9] tracking-[-0.04em] [font-variation-settings:'wdth'_125]">
-        {['Pick a car.', 'Pick your', 'Go.'].map((line, i) => (
-          <motion.span
-            key={line}
-            className="block"
-            initial={{ opacity: 0, y: 40 }}
+            <h1 className="mt-6 text-[clamp(3rem,9vw,8.5rem)] font-extrabold leading-[0.9] tracking-[-0.04em] [font-variation-settings:'wdth'_125]">
+              {['Pick a car.', 'Pick your', 'Go.'].map((line, i) => (
+                <motion.span
+                  key={line}
+                  className="block"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8, ease, delay: 0.1 + i * 0.08 }}
+                >
+                  {line}
+                  {i === 1 && (
+                    <span className="serif-italic font-normal text-[var(--odo-red-tint)]">
+                      {' '}days.
+                    </span>
+                  )}
+                </motion.span>
+              ))}
+            </h1>
+          </div>
+
+          <motion.div
+            className="lg:col-span-12"
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease, delay: 0.1 + i * 0.08 }}
+            transition={{ duration: 0.8, ease, delay: 0.5 }}
           >
-            {line}
-            {i === 1 && (
-              <span className="serif-italic font-normal text-[var(--odo-red-tint)]">
-                {' '}days.
-              </span>
-            )}
-          </motion.span>
-        ))}
-      </h1>
-    </div>
-
-    <motion.div
-      className="lg:col-span-12"
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease, delay: 0.5 }}
-    >
-      <SearchBar />
-    </motion.div>
-  </div>
-    </section>
+            <SearchBar />
+          </motion.div>
+        </div>
+      </section>
 
       {/* Categories */}
       <section className="mx-auto max-w-[1440px] px-6 pt-24">
         <SectionHeader n={2} label="Browse by type" />
         <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
           {cats.data?.map((c) => {
-            const n = cars.data?.filter((x) => x.category.id === c.id && x.available).length ?? 0
+            const n = available.filter((x) => x.category.id === c.id).length
             const pct = Number(c.discountPercent) || 0
             return (
               <li key={c.id} className="flex">

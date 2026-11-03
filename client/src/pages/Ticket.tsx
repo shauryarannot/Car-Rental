@@ -7,18 +7,20 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { vehicleToCar } from '@/api/http'
-import { formatINR } from '@/lib/utils'
+import { bookingRef, formatINR } from '@/lib/utils'
 import { prettyDate } from '@/lib/trip'
 
-export const bookingRef = (id: number) => `ODO-${String(id).padStart(6, '0')}`
-
-/** Deterministic barcode bars from the booking id. */
-function Barcode({ seed }: { seed: number }) {
+function computeBarcodeBars(seed: number): number[] {
   let x = seed * 9301 + 49297
-  const bars = Array.from({ length: 48 }, () => {
+  return Array.from({ length: 48 }, () => {
     x = (x * 9301 + 49297) % 233280
     return 1 + Math.floor((x / 233280) * 3)
   })
+}
+
+/** Deterministic barcode bars from the booking id. */
+function Barcode({ seed }: { seed: number }) {
+  const bars = computeBarcodeBars(seed)
   return (
     <div aria-hidden className="flex h-14 items-stretch gap-[2px]">
       {bars.map((w, i) => <span key={i} className="bg-ink" style={{ width: w }} />)}
@@ -29,8 +31,8 @@ function Barcode({ seed }: { seed: number }) {
 function downloadIcs(r: Rental) {
   const d = (s: string) => s.replace(/-/g, '')
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ODO//Car Rental//EN', 'BEGIN:VEVENT',
-    `UID:${bookingRef(r.id)}@odo`, `DTSTART;VALUE=DATE:${d(r.startDate)}`, `DTEND;VALUE=DATE:${d(r.endDate)}`,
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ryde.exe//Car Rental//EN', 'BEGIN:VEVENT',
+    `UID:${bookingRef(r.id)}@ryde.exe`, `DTSTART;VALUE=DATE:${d(r.startDate)}`, `DTEND;VALUE=DATE:${d(r.endDate)}`,
     `SUMMARY:${r.vehicle.name} rental (${bookingRef(r.id)})`, `DESCRIPTION:Total ${formatINR(Number(r.totalAmount))}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n')
@@ -109,4 +111,3 @@ export default function Ticket() {
     </div>
   )
 }
-

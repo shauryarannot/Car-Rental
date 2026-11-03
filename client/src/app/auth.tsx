@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthResponse, Role } from '@/api/types'
 
 export interface AuthUser {
@@ -57,7 +57,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    localStorage.setItem('odo-email', email)
     setUser(next)
   }, [])
 
@@ -72,18 +71,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('odo:unauthorized', onUnauthorized)
   }, [logout])
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAdmin: user?.role === 'ADMIN',
-        isCustomer: user?.role === 'CUSTOMER',
-        login,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      isAdmin: user?.role === 'ADMIN',
+      isCustomer: user?.role === 'CUSTOMER',
+      login,
+      logout,
+    }),
+    [user, login, logout],
   )
-}
 
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}

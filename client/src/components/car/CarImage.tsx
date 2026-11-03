@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 /** Line silhouette per body style, used when no photo exists or it fails to load. */
@@ -18,13 +18,22 @@ function Silhouette({ category }: { category: string }) {
 }
 
 export function CarImage({
-  src, alt, category, className, eager, grey,
-}: { src?: string; alt: string; category: string; className?: string; eager?: boolean; grey?: boolean }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    setFailed(false)
-  }, [src])
+  src,
+  alt,
+  category,
+  className,
+  eager,
+  grey,
+}: {
+  src?: string
+  alt: string
+  category: string
+  className?: string
+  eager?: boolean
+  grey?: boolean
+}) {
+  const [failedSrc, setFailedSrc] = useState<string>()
+  const failed = Boolean(src && failedSrc === src)
 
   if (!src || failed) {
     return (
@@ -43,7 +52,7 @@ export function CarImage({
         height={400}
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
-        onError={() => setFailed(true)}
+        onError={() => setFailedSrc(src)}
         className={cn(
           'h-full w-full object-cover object-center transition-[transform,filter] duration-500 ease-odo',
           grey && 'grayscale',

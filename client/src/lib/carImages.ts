@@ -1,9 +1,8 @@
 import images from '@/data/carImages.json'
 
-const map = images as Record<string, { src: string; page?: string }>
+const map = images as Record<string, string>
 
-/** Photo for a vehicle name, from the generated Wikipedia lookup. Undefined = use silhouette. */
+/** Photo for a vehicle name, from the local image lookup. Undefined = use silhouette. */
 export function carImage(name: string): string | undefined {
-  return map[name]?.src
+  return map[name]
 }
-
