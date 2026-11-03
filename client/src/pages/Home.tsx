@@ -115,7 +115,7 @@ export default function Home() {
         transition={{ duration: 0.8 }}
         className="mono-label"
       >
-        FIG. 01 — {cars.data ? `${available.length} cars available today` : 'counting the lot'}
+         {cars.data ? `${available.length} cars available today` : 'counting the lot'}
       </motion.p>
 
       <h1 className="mt-6 text-[clamp(3rem,9vw,8.5rem)] font-extrabold leading-[0.9] tracking-[-0.04em] [font-variation-settings:'wdth'_125]">
