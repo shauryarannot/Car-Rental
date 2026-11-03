@@ -47,7 +47,7 @@ export function Navbar() {
     >
       <nav aria-label="Primary" className="mx-auto flex h-14 max-w-[1440px] items-center gap-8 px-6">
         <Link to={user ? '/' : '/login'} className="wordmark text-xl">
-          ODO
+          Ryd.exe
         </Link>
 
         <ul className="hidden items-center gap-6 sm:flex">
