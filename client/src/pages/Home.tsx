@@ -1,10 +1,10 @@
+
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { SectionHeader } from '@/components/ui/section-header'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
-import { CarImage } from '@/components/car/CarImage'
 import { useCars, useCategories, useCoupons } from '@/hooks/queries'
 import { MAX_DAYS, returnDateFor, daysUntil, clampDays, prettyDate } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
@@ -89,46 +89,65 @@ export default function Home() {
   const coupons = useCoupons()
   const available = cars.data?.filter((c) => c.available) ?? []
   const featured = [...available].sort((a, b) => Number(!!b.imageUrl) - Number(!!a.imageUrl) || b.pricePerDay - a.pricePerDay).slice(0, 6)
-  const hero = available.find((c) => c.imageUrl && /suv/i.test(c.category.name)) ?? available.find((c) => c.imageUrl)
 
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[var(--odo-red-bright)] to-[var(--odo-signal)] text-white">
-        <div className="mx-auto grid max-w-[1440px] gap-10 px-6 pb-12 pt-16 lg:grid-cols-12 lg:pt-24">
-          <div className="lg:col-span-7">
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }} className="mono-label">
-              FIG. 01 — {cars.data ? `${available.length} cars available today` : 'counting the lot'}
-            </motion.p>
-            <h1 className="mt-6 text-[clamp(3rem,9vw,8.5rem)] font-extrabold leading-[0.9] tracking-[-0.04em] [font-variation-settings:'wdth'_125]">
-              {['Pick a car.', 'Pick your', 'Go.'].map((line, i) => (
-                <motion.span key={line} className="block" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease, delay: 0.1 + i * 0.08 }}>
-                  {line}
-                  {i === 1 && <span className="serif-italic font-normal text-[var(--odo-red-tint)]"> days.</span>}
-                </motion.span>
-              ))}
-            </h1>
-          </div>
-          <motion.div
-            className="relative hidden lg:col-span-5 lg:block"
-            initial={{ opacity: 0, x: -60 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, ease, delay: 0.35 }}
+    <section className="relative isolate overflow-hidden text-white">
+  <video
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    className="absolute inset-0 -z-20 h-full w-full object-cover"
+  >
+    <source src="/videos/car_video.mp4" type="video/mp4" />
+  </video>
+
+  <div className="absolute inset-0 -z-10 bg-black/40" />
+
+  <div className="mx-auto grid max-w-[1440px] gap-10 px-6 pb-12 pt-16 lg:grid-cols-12 lg:pt-24">
+    <div className="lg:col-span-7">
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="mono-label"
+      >
+        FIG. 01 — {cars.data ? `${available.length} cars available today` : 'counting the lot'}
+      </motion.p>
+
+      <h1 className="mt-6 text-[clamp(3rem,9vw,8.5rem)] font-extrabold leading-[0.9] tracking-[-0.04em] [font-variation-settings:'wdth'_125]">
+        {['Pick a car.', 'Pick your', 'Go.'].map((line, i) => (
+          <motion.span
+            key={line}
+            className="block"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease, delay: 0.1 + i * 0.08 }}
           >
-            {hero && (
-              <figure className="absolute inset-0 border border-white/30">
-                <CarImage src={hero.imageUrl} alt={hero.name} category={hero.category.name} eager className="h-full" />
-                <figcaption className="mono-label absolute bottom-0 left-0 bg-ink px-3 py-2 text-paper">
-                  {hero.name} · {formatINR(hero.pricePerDay)} / day
-                </figcaption>
-              </figure>
+            {line}
+            {i === 1 && (
+              <span className="serif-italic font-normal text-[var(--odo-red-tint)]">
+                {' '}days.
+              </span>
             )}
-          </motion.div>
-          <motion.div className="lg:col-span-12" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease, delay: 0.5 }}>
-            <SearchBar />
-          </motion.div>
-        </div>
-      </section>
+          </motion.span>
+        ))}
+      </h1>
+    </div>
+
+    <motion.div
+      className="lg:col-span-12"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease, delay: 0.5 }}
+    >
+      <SearchBar />
+    </motion.div>
+  </div>
+    </section>
 
       {/* Categories */}
       <section className="mx-auto max-w-[1440px] px-6 pt-24">
