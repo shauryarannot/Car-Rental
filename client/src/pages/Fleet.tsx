@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
 import { useCars, useCategories } from '@/hooks/queries'
-import { MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
 
 type Sort = 'relevance' | 'price-asc' | 'price-desc' | 'name'
@@ -113,7 +113,7 @@ export default function Fleet() {
               aria-label="Trip duration in days"
               className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
             >
-              {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+              {DURATION_DAYS.map((d) => (
                 <option key={d} value={d} className="bg-card text-ink">
                   {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d))})
                 </option>

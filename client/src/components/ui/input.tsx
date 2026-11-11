@@ -1,13 +1,13 @@
-import { forwardRef, useId, type InputHTMLAttributes } from 'react'
+import { useId, type ComponentPropsWithRef } from 'react'
 import { cn } from '@/lib/utils'
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends ComponentPropsWithRef<'input'> {
   label: string
   error?: string
 }
 
 /** Underline-only field with a mono label. Errors are plain language with an icon glyph, never colour alone. */
-export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, error, className, id, ...props }, ref) => {
+export function Input({ label, error, className, id, ...props }: InputProps) {
   const auto = useId()
   const fid = id ?? auto
   return (
@@ -16,7 +16,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, error, c
         {label}
       </label>
       <input
-        ref={ref}
         id={fid}
         aria-invalid={!!error}
         aria-describedby={error ? `${fid}-err` : undefined}
@@ -31,6 +30,5 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({ label, error, c
       )}
     </div>
   )
-})
-Input.displayName = 'Input'
+}
 

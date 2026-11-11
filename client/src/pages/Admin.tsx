@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
@@ -22,6 +22,32 @@ import { prettyDate } from '@/lib/trip'
 import { bookingRef, cn, formatINR } from '@/lib/utils'
 
 type AdminTab = 'fleet' | 'rentals' | 'categories' | 'coupons' | 'customers'
+
+const actionBtn = 'mono-label border border-hairline px-2.5 py-1.5 hover:border-ink'
+const dangerBtn = 'mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep'
+const searchClass = 'min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal'
+const selectClass = 'mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal'
+
+const errMsg = (e: unknown, fallback: string) => (isApiError(e) ? e.message : fallback)
+
+function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto border border-hairline bg-card">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
+            {headers.map((h, i) => (
+              <th key={h} className={cn('p-4', i === headers.length - 1 && 'text-right')}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-hairline">{children}</tbody>
+      </table>
+    </div>
+  )
+}
 
 function SlideOver({
   open,
@@ -59,6 +85,52 @@ function SlideOver({
   )
 }
 
+function FormSlideOver({
+  open,
+  title,
+  saveLabel,
+  pending,
+  onClose,
+  onSubmit,
+  children,
+}: {
+  open: boolean
+  title: string
+  saveLabel: string
+  pending: boolean
+  onClose: () => void
+  onSubmit: () => void
+  children: ReactNode
+}) {
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    onSubmit()
+  }
+  return (
+    <SlideOver open={open} onClose={onClose}>
+      {open && (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex items-center justify-between border-b border-hairline pb-4">
+            <p className="mono-label">{title}</p>
+            <button type="button" className="mono-label" onClick={onClose}>
+              Close
+            </button>
+          </div>
+          {children}
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={pending}>
+              {pending ? 'Saving…' : saveLabel}
+            </Button>
+          </div>
+        </form>
+      )}
+    </SlideOver>
+  )
+}
+
 export default function Admin() {
   const { user, isAdmin } = useAuth()
   const qc = useQueryClient()
@@ -70,14 +142,12 @@ export default function Admin() {
   const customers = useCustomers()
   const bookings = useAllBookings()
 
-  // Search & filter state
   const [carSearch, setCarSearch] = useState('')
   const [carCatFilter, setCarCatFilter] = useState('')
   const [rentalFilter, setRentalFilter] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ACTIVE')
   const [rentalSearch, setRentalSearch] = useState('')
   const [custSearch, setCustSearch] = useState('')
 
-  // Slide-over sheet state
   const [vehicleModal, setVehicleModal] = useState<{
     id?: number
     name: string
@@ -119,7 +189,7 @@ export default function Admin() {
 
   // --- Mutations ---
   const saveVehicle = useMutation({
-    mutationFn: async (v: NonNullable<typeof vehicleModal>) => {
+    mutationFn: (v: NonNullable<typeof vehicleModal>) => {
       const payload = {
         name: v.name.trim(),
         dailyRate: Number(v.dailyRate),
@@ -133,7 +203,7 @@ export default function Admin() {
       setVehicleModal(null)
       toast.success('Vehicle saved.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to save vehicle.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to save vehicle.')),
   })
 
   const toggleVehicleAvail = useMutation({
@@ -148,7 +218,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['cars'] })
       toast.success(`${updated.name} marked ${updated.available ? 'Available' : 'Out'}.`)
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not update availability.'),
+    onError: (e) => toast.error(errMsg(e, 'Could not update availability.')),
   })
 
   const removeVehicle = useMutation({
@@ -157,11 +227,11 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['cars'] })
       toast.success('Vehicle deleted.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Cannot delete a vehicle with existing rental history.'),
+    onError: (e) => toast.error(errMsg(e, 'Cannot delete a vehicle with existing rental history.')),
   })
 
   const saveCategory = useMutation({
-    mutationFn: async (c: NonNullable<typeof categoryModal>) => {
+    mutationFn: (c: NonNullable<typeof categoryModal>) => {
       const payload = { name: c.name.trim(), discountPercent: Number(c.discountPercent) }
       return c.id ? api.updateCategory(c.id, payload) : api.createCategory(payload)
     },
@@ -171,7 +241,7 @@ export default function Admin() {
       setCategoryModal(null)
       toast.success('Category saved.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to save category.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to save category.')),
   })
 
   const removeCategory = useMutation({
@@ -180,11 +250,11 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['categories'] })
       toast.success('Category deleted.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Cannot delete a category that still has vehicles.'),
+    onError: (e) => toast.error(errMsg(e, 'Cannot delete a category that still has vehicles.')),
   })
 
   const saveCoupon = useMutation({
-    mutationFn: async (c: NonNullable<typeof couponModal>) => {
+    mutationFn: (c: NonNullable<typeof couponModal>) => {
       const isDur = c.couponType === 'DURATION'
       const payload = {
         code: c.code.trim().toUpperCase(),
@@ -200,7 +270,7 @@ export default function Admin() {
       setCouponModal(null)
       toast.success('Coupon saved.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to save coupon.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to save coupon.')),
   })
 
   const removeCoupon = useMutation({
@@ -209,11 +279,11 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['coupons'] })
       toast.success('Coupon deleted.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to delete coupon.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to delete coupon.')),
   })
 
   const saveCustomer = useMutation({
-    mutationFn: async (c: NonNullable<typeof customerModal>) => {
+    mutationFn: (c: NonNullable<typeof customerModal>) => {
       const payload = {
         name: c.name.trim(),
         email: c.email.trim(),
@@ -227,7 +297,7 @@ export default function Admin() {
       setCustomerModal(null)
       toast.success('Customer saved.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to save customer.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to save customer.')),
   })
 
   const deactivateCustomer = useMutation({
@@ -236,7 +306,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['customers'] })
       toast.success('Customer deactivated.')
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to deactivate customer.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to deactivate customer.')),
   })
 
   const returnRental = useMutation({
@@ -246,7 +316,7 @@ export default function Admin() {
       qc.invalidateQueries({ queryKey: ['cars'] })
       toast.success(`Returned ${r.vehicle.name} (${bookingRef(r.id)}).`)
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Failed to return rental.'),
+    onError: (e) => toast.error(errMsg(e, 'Failed to return rental.')),
   })
 
   // --- Computed stats & filtered lists ---
@@ -283,18 +353,22 @@ export default function Admin() {
   }, [bookings.data, rentalFilter, rentalSearch])
 
   const filteredCustomers = useMemo(() => {
-    let list = customers.data ?? []
-    if (custSearch) {
-      const q = custSearch.toLowerCase()
-      list = list.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q) ||
-          (c.employeeId && c.employeeId.toLowerCase().includes(q)),
-      )
-    }
-    return list
+    const list = customers.data ?? []
+    if (!custSearch) return list
+    const q = custSearch.toLowerCase()
+    return list.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.employeeId?.toLowerCase().includes(q),
+    )
   }, [customers.data, custSearch])
+
+  const openNewVehicleModal = () =>
+    setVehicleModal({ name: '', dailyRate: 2500, available: true, categoryId: categories.data?.[0]?.id ?? 1 })
+
+  const openNewCouponModal = () =>
+    setCouponModal({ code: '', couponType: 'DURATION', discountPercent: 15, minDays: '3', maxDays: '7' })
 
   if (!isAdmin) {
     return (
@@ -337,31 +411,10 @@ export default function Admin() {
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button
-            onClick={() =>
-              setVehicleModal({
-                name: '',
-                dailyRate: 2500,
-                available: true,
-                categoryId: categories.data?.[0]?.id ?? 1,
-              })
-            }
-            arrow
-          >
+          <Button onClick={openNewVehicleModal} arrow>
             + Add vehicle
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              setCouponModal({
-                code: '',
-                couponType: 'DURATION',
-                discountPercent: 15,
-                minDays: '3',
-                maxDays: '7',
-              })
-            }
-          >
+          <Button variant="secondary" onClick={openNewCouponModal}>
             + Add coupon
           </Button>
         </div>
@@ -369,30 +422,26 @@ export default function Admin() {
 
       {/* Night Drive Instrument Readout Band */}
       <div className="night-drive mt-8 grid grid-cols-2 border border-hairline bg-[var(--odo-bg)] text-[var(--odo-text)] lg:grid-cols-4">
-        <div className="border-b border-r border-hairline p-6 lg:border-b-0">
-          <p className="mono-label text-[var(--odo-muted)]">Cumulative Revenue</p>
-          <Counter value={stats.revenue} prefix="₹ " className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]" />
-          <p className="mono-label mt-2 text-[var(--odo-muted)]">Across {stats.totalRentals} rentals</p>
-        </div>
-        <div className="border-b border-hairline p-6 lg:border-b-0 lg:border-r">
-          <p className="mono-label text-[var(--odo-muted)]">Active on the road</p>
-          <Counter value={stats.activeCount} suffix=" cars" className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]" />
-          <p className="mono-label mt-2 text-[var(--odo-muted)]">Currently dispatched</p>
-        </div>
-        <div className="border-r border-hairline p-6">
-          <p className="mono-label text-[var(--odo-muted)]">Available on the lot</p>
-          <Counter value={stats.availCars} suffix={` / ${stats.totalCars}`} className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]" />
-          <p className="mono-label mt-2 text-[var(--odo-muted)]">Ready for immediate booking</p>
-        </div>
-        <div className="p-6">
-          <p className="mono-label text-[var(--odo-muted)]">Active Customers & Offers</p>
-          <Counter
-            value={customers.data?.length ?? 0}
-            suffix={` · ${coupons.data?.length ?? 0} coupons`}
-            className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]"
-          />
-          <p className="mono-label mt-2 text-[var(--odo-muted)]">Verified accounts</p>
-        </div>
+        {[
+          { label: 'Cumulative Revenue', value: stats.revenue, prefix: '₹ ', sub: `Across ${stats.totalRentals} rentals` },
+          { label: 'Active on the road', value: stats.activeCount, suffix: ' cars', sub: 'Currently dispatched' },
+          { label: 'Available on the lot', value: stats.availCars, suffix: ` / ${stats.totalCars}`, sub: 'Ready for immediate booking' },
+          { label: 'Active Customers & Offers', value: customers.data?.length ?? 0, suffix: ` · ${coupons.data?.length ?? 0} coupons`, sub: 'Verified accounts' },
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className={cn(
+              'border-hairline p-6',
+              i < 2 && 'border-b lg:border-b-0',
+              i % 2 === 0 && 'border-r',
+              i === 1 && 'lg:border-r',
+            )}
+          >
+            <p className="mono-label text-[var(--odo-muted)]">{s.label}</p>
+            <Counter value={s.value} prefix={s.prefix} suffix={s.suffix} className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]" />
+            <p className="mono-label mt-2 text-[var(--odo-muted)]">{s.sub}</p>
+          </div>
+        ))}
       </div>
 
       {/* Section Tabs */}
@@ -425,7 +474,7 @@ export default function Admin() {
               value={carSearch}
               onChange={(e) => setCarSearch(e.target.value)}
               placeholder="Filter vehicles by make or model…"
-              className="min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal sm:max-w-sm"
+              className={cn(searchClass, 'sm:max-w-sm')}
             />
             <select
               value={carCatFilter}
@@ -439,91 +488,58 @@ export default function Admin() {
                 </option>
               ))}
             </select>
-            <Button
-              variant="secondary"
-              className="ml-auto min-h-11"
-              onClick={() =>
-                setVehicleModal({
-                  name: '',
-                  dailyRate: 2500,
-                  available: true,
-                  categoryId: categories.data?.[0]?.id ?? 1,
-                })
-              }
-            >
+            <Button variant="secondary" className="ml-auto min-h-11" onClick={openNewVehicleModal}>
               + New Vehicle
             </Button>
           </div>
 
-          <div className="overflow-x-auto border border-hairline bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Vehicle</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Daily Rate</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {filteredCars.map((c) => (
-                  <tr key={c.id} className="hover:bg-surface-alt/50">
-                    <td className="mono p-4 text-muted-foreground">#{c.id}</td>
-                    <td className="p-4 font-semibold">
-                      <Link to={`/fleet/${c.id}`} className="hover:underline">
-                        {c.name}
-                      </Link>
-                    </td>
-                    <td className="mono-label p-4">
-                      {c.category.name}
-                      {Number(c.category.discountPercent) > 0 && (
-                        <span className="ml-2 text-red-deep">(-{Number(c.category.discountPercent)}%)</span>
-                      )}
-                    </td>
-                    <td className="mono p-4 font-medium">{formatINR(c.pricePerDay)}</td>
-                    <td className="p-4">
-                      <StatusPill status={c.available ? 'available' : 'out'} />
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleVehicleAvail.mutate(c)}
-                          className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                        >
-                          {c.available ? 'Mark Out' : 'Mark Available'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setVehicleModal({
-                              id: c.id,
-                              name: c.name,
-                              dailyRate: c.pricePerDay,
-                              available: c.available,
-                              categoryId: c.category.id,
-                            })
-                          }
-                          className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeVehicle.mutate(c.id)}
-                          className="mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable headers={['ID', 'Vehicle', 'Category', 'Daily Rate', 'Status', 'Actions']}>
+            {filteredCars.map((c) => (
+              <tr key={c.id} className="hover:bg-surface-alt/50">
+                <td className="mono p-4 text-muted-foreground">#{c.id}</td>
+                <td className="p-4 font-semibold">
+                  <Link to={`/fleet/${c.id}`} className="hover:underline">
+                    {c.name}
+                  </Link>
+                </td>
+                <td className="mono-label p-4">
+                  {c.category.name}
+                  {Number(c.category.discountPercent) > 0 && (
+                    <span className="ml-2 text-red-deep">(-{Number(c.category.discountPercent)}%)</span>
+                  )}
+                </td>
+                <td className="mono p-4 font-medium">{formatINR(c.pricePerDay)}</td>
+                <td className="p-4">
+                  <StatusPill status={c.available ? 'available' : 'out'} />
+                </td>
+                <td className="p-4 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <button type="button" onClick={() => toggleVehicleAvail.mutate(c)} className={actionBtn}>
+                      {c.available ? 'Mark Out' : 'Mark Available'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVehicleModal({
+                          id: c.id,
+                          name: c.name,
+                          dailyRate: c.pricePerDay,
+                          available: c.available,
+                          categoryId: c.category.id,
+                        })
+                      }
+                      className={actionBtn}
+                    >
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => removeVehicle.mutate(c.id)} className={dangerBtn}>
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
         </div>
       )}
 
@@ -551,70 +567,56 @@ export default function Admin() {
               value={rentalSearch}
               onChange={(e) => setRentalSearch(e.target.value)}
               placeholder="Search by customer, vehicle, or reference (Ryde.exe-…)…"
-              className="min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal sm:max-w-md"
+              className={cn(searchClass, 'sm:max-w-md')}
             />
-            <span className="mono-label ml-auto text-muted-foreground">Showing {Math.min(filteredRentals.length, 150)} of {filteredRentals.length}</span>
+            <span className="mono-label ml-auto text-muted-foreground">
+              Showing {Math.min(filteredRentals.length, 150)} of {filteredRentals.length}
+            </span>
           </div>
 
-          <div className="overflow-x-auto border border-hairline bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
-                  <th className="p-4">Ref</th>
-                  <th className="p-4">Customer</th>
-                  <th className="p-4">Vehicle</th>
-                  <th className="p-4">Dates & Duration</th>
-                  <th className="p-4">Benefit</th>
-                  <th className="p-4">Total</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {filteredRentals.slice(0, 150).map((r) => (
-                  <tr key={r.id} className="hover:bg-surface-alt/50">
-                    <td className="mono p-4 font-medium">
-                      <Link to={`/bookings/${r.id}`} className="hover:underline">
-                        {bookingRef(r.id)}
-                      </Link>
-                    </td>
-                    <td className="p-4">
-                      <p className="font-medium">{r.customer.name}</p>
-                      <p className="mono text-xs text-muted-foreground">{r.customer.email}</p>
-                    </td>
-                    <td className="p-4 font-medium">{r.vehicle.name}</td>
-                    <td className="mono p-4 text-xs">
-                      {prettyDate(r.startDate)} → {prettyDate(r.endDate)} ({r.days}d)
-                    </td>
-                    <td className="mono-label p-4 text-muted-foreground">
-                      {r.couponCode ?? (r.benefitType === 'NONE' ? '—' : r.benefitType)}
-                      {Number(r.discountPercent) > 0 && ` (-${Number(r.discountPercent)}%)`}
-                    </td>
-                    <td className="mono p-4 font-medium">{formatINR(Number(r.totalAmount))}</td>
-                    <td className="p-4">
-                      <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <Link to={`/bookings/${r.id}`} className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink">
-                          Ticket
-                        </Link>
-                        {r.status === 'ACTIVE' && (
-                          <button
-                            type="button"
-                            onClick={() => returnRental.mutate(r.id)}
-                            className="mono-label border border-ink bg-ink px-2.5 py-1.5 text-paper hover:bg-signal hover:border-signal"
-                          >
-                            Return Car
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable headers={['Ref', 'Customer', 'Vehicle', 'Dates & Duration', 'Benefit', 'Total', 'Status', 'Actions']}>
+            {filteredRentals.slice(0, 150).map((r) => (
+              <tr key={r.id} className="hover:bg-surface-alt/50">
+                <td className="mono p-4 font-medium">
+                  <Link to={`/bookings/${r.id}`} className="hover:underline">
+                    {bookingRef(r.id)}
+                  </Link>
+                </td>
+                <td className="p-4">
+                  <p className="font-medium">{r.customer.name}</p>
+                  <p className="mono text-xs text-muted-foreground">{r.customer.email}</p>
+                </td>
+                <td className="p-4 font-medium">{r.vehicle.name}</td>
+                <td className="mono p-4 text-xs">
+                  {prettyDate(r.startDate)} → {prettyDate(r.endDate)} ({r.days}d)
+                </td>
+                <td className="mono-label p-4 text-muted-foreground">
+                  {r.couponCode ?? (r.benefitType === 'NONE' ? '—' : r.benefitType)}
+                  {Number(r.discountPercent) > 0 && ` (-${Number(r.discountPercent)}%)`}
+                </td>
+                <td className="mono p-4 font-medium">{formatINR(Number(r.totalAmount))}</td>
+                <td className="p-4">
+                  <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
+                </td>
+                <td className="p-4 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <Link to={`/bookings/${r.id}`} className={actionBtn}>
+                      Ticket
+                    </Link>
+                    {r.status === 'ACTIVE' && (
+                      <button
+                        type="button"
+                        onClick={() => returnRental.mutate(r.id)}
+                        className="mono-label border border-ink bg-ink px-2.5 py-1.5 text-paper hover:border-signal hover:bg-signal"
+                      >
+                        Return Car
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
         </div>
       )}
 
@@ -627,62 +629,39 @@ export default function Admin() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto border border-hairline bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Category Name</th>
-                  <th className="p-4">Category Discount</th>
-                  <th className="p-4">Vehicles Assigned</th>
-                  <th className="p-4 text-right">Actions</th>
+          <DataTable headers={['ID', 'Category Name', 'Category Discount', 'Vehicles Assigned', 'Actions']}>
+            {categories.data?.map((cat: Category) => {
+              const count = cars.data?.filter((v) => v.category.id === cat.id).length ?? 0
+              return (
+                <tr key={cat.id} className="hover:bg-surface-alt/50">
+                  <td className="mono p-4 text-muted-foreground">#{cat.id}</td>
+                  <td className="p-4 font-semibold">{cat.name}</td>
+                  <td className="mono p-4">
+                    {Number(cat.discountPercent) > 0 ? (
+                      <span className="font-medium text-red-deep">{Number(cat.discountPercent)}% off</span>
+                    ) : (
+                      <span className="text-muted-foreground">0% (Standard)</span>
+                    )}
+                  </td>
+                  <td className="mono p-4">{count} vehicles</td>
+                  <td className="p-4 text-right">
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCategoryModal({ id: cat.id, name: cat.name, discountPercent: Number(cat.discountPercent) })}
+                        className={actionBtn}
+                      >
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => removeCategory.mutate(cat.id)} className={dangerBtn}>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {categories.data?.map((cat: Category) => {
-                  const count = cars.data?.filter((v) => v.category.id === cat.id).length ?? 0
-                  return (
-                    <tr key={cat.id} className="hover:bg-surface-alt/50">
-                      <td className="mono p-4 text-muted-foreground">#{cat.id}</td>
-                      <td className="p-4 font-semibold">{cat.name}</td>
-                      <td className="mono p-4">
-                        {Number(cat.discountPercent) > 0 ? (
-                          <span className="text-red-deep font-medium">{Number(cat.discountPercent)}% off</span>
-                        ) : (
-                          <span className="text-muted-foreground">0% (Standard)</span>
-                        )}
-                      </td>
-                      <td className="mono p-4">{count} vehicles</td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCategoryModal({
-                                id: cat.id,
-                                name: cat.name,
-                                discountPercent: Number(cat.discountPercent),
-                              })
-                            }
-                            className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => removeCategory.mutate(cat.id)}
-                            className="mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+              )
+            })}
+          </DataTable>
         </div>
       )}
 
@@ -690,78 +669,49 @@ export default function Admin() {
       {tab === 'coupons' && (
         <div className="mt-8 space-y-6">
           <div className="flex justify-end">
-            <Button
-              variant="secondary"
-              onClick={() =>
-                setCouponModal({
-                  code: '',
-                  couponType: 'DURATION',
-                  discountPercent: 15,
-                  minDays: '3',
-                  maxDays: '7',
-                })
-              }
-            >
+            <Button variant="secondary" onClick={openNewCouponModal}>
               + New Coupon
             </Button>
           </div>
 
-          <div className="overflow-x-auto border border-hairline bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Coupon Code</th>
-                  <th className="p-4">Type</th>
-                  <th className="p-4">Discount</th>
-                  <th className="p-4">Qualification Rule</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {coupons.data?.map((cp: DiscountCoupon) => (
-                  <tr key={cp.id} className="hover:bg-surface-alt/50">
-                    <td className="mono p-4 text-muted-foreground">#{cp.id}</td>
-                    <td className="mono p-4 font-semibold">{cp.code}</td>
-                    <td className="mono-label p-4">{cp.couponType}</td>
-                    <td className="mono p-4 font-medium text-red-deep">{Number(cp.discountPercent)}%</td>
-                    <td className="p-4 text-muted-foreground">
-                      {cp.couponType === 'FIRST_RENTAL' && "Customer's first rental only (fixed 50%)"}
-                      {cp.couponType === 'EMPLOYEE' && 'Requires Motherson Employee ID'}
-                      {cp.couponType === 'DURATION' && `${cp.minDays} to ${cp.maxDays} rental days`}
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCouponModal({
-                              id: cp.id,
-                              code: cp.code,
-                              couponType: cp.couponType,
-                              discountPercent: Number(cp.discountPercent),
-                              minDays: cp.minDays ? String(cp.minDays) : '',
-                              maxDays: cp.maxDays ? String(cp.maxDays) : '',
-                            })
-                          }
-                          className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeCoupon.mutate(cp.id)}
-                          className="mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable headers={['ID', 'Coupon Code', 'Type', 'Discount', 'Qualification Rule', 'Actions']}>
+            {coupons.data?.map((cp: DiscountCoupon) => (
+              <tr key={cp.id} className="hover:bg-surface-alt/50">
+                <td className="mono p-4 text-muted-foreground">#{cp.id}</td>
+                <td className="mono p-4 font-semibold">{cp.code}</td>
+                <td className="mono-label p-4">{cp.couponType}</td>
+                <td className="mono p-4 font-medium text-red-deep">{Number(cp.discountPercent)}%</td>
+                <td className="p-4 text-muted-foreground">
+                  {cp.couponType === 'FIRST_RENTAL' && "Customer's first rental only (fixed 50%)"}
+                  {cp.couponType === 'EMPLOYEE' && 'Requires Motherson Employee ID'}
+                  {cp.couponType === 'DURATION' && `${cp.minDays} to ${cp.maxDays} rental days`}
+                </td>
+                <td className="p-4 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCouponModal({
+                          id: cp.id,
+                          code: cp.code,
+                          couponType: cp.couponType,
+                          discountPercent: Number(cp.discountPercent),
+                          minDays: cp.minDays ? String(cp.minDays) : '',
+                          maxDays: cp.maxDays ? String(cp.maxDays) : '',
+                        })
+                      }
+                      className={actionBtn}
+                    >
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => removeCoupon.mutate(cp.id)} className={dangerBtn}>
+                      Delete
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
         </div>
       )}
 
@@ -774,7 +724,7 @@ export default function Admin() {
               value={custSearch}
               onChange={(e) => setCustSearch(e.target.value)}
               placeholder="Search customers by name, email, or employee ID…"
-              className="min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal sm:max-w-md"
+              className={cn(searchClass, 'sm:max-w-md')}
             />
             <Button
               variant="secondary"
@@ -785,101 +735,67 @@ export default function Admin() {
             </Button>
           </div>
 
-          <div className="overflow-x-auto border border-hairline bg-card">
-            <table className="w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-hairline bg-surface-alt mono-label text-muted-foreground">
-                  <th className="p-4">ID</th>
-                  <th className="p-4">Name</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">Phone</th>
-                  <th className="p-4">Employee ID</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {filteredCustomers.map((cust) => (
-                  <tr key={cust.id} className="hover:bg-surface-alt/50">
-                    <td className="mono p-4 text-muted-foreground">#{cust.id}</td>
-                    <td className="p-4 font-semibold">{cust.name}</td>
-                    <td className="mono p-4 text-xs">{cust.email}</td>
-                    <td className="mono p-4 text-xs text-muted-foreground">{cust.phone || '—'}</td>
-                    <td className="mono p-4 text-xs">
-                      {cust.employeeId ? (
-                        <span className="border border-hairline px-2 py-0.5">{cust.employeeId}</span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="mono-label p-4">{cust.role ?? 'CUSTOMER'}</td>
-                    <td className="p-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setHistoryCustomer(cust)}
-                          className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                        >
-                          History
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCustomerModal({
-                              id: cust.id,
-                              name: cust.name,
-                              email: cust.email,
-                              phone: cust.phone ?? '',
-                              employeeId: cust.employeeId ?? '',
-                            })
-                          }
-                          className="mono-label border border-hairline px-2.5 py-1.5 hover:border-ink"
-                        >
-                          Edit
-                        </button>
-                        {cust.role !== 'ADMIN' && (
-                          <button
-                            type="button"
-                            onClick={() => deactivateCustomer.mutate(cust.id)}
-                            className="mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep"
-                          >
-                            Deactivate
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable headers={['ID', 'Name', 'Email', 'Phone', 'Employee ID', 'Role', 'Actions']}>
+            {filteredCustomers.map((cust) => (
+              <tr key={cust.id} className="hover:bg-surface-alt/50">
+                <td className="mono p-4 text-muted-foreground">#{cust.id}</td>
+                <td className="p-4 font-semibold">{cust.name}</td>
+                <td className="mono p-4 text-xs">{cust.email}</td>
+                <td className="mono p-4 text-xs text-muted-foreground">{cust.phone || '—'}</td>
+                <td className="mono p-4 text-xs">
+                  {cust.employeeId ? <span className="border border-hairline px-2 py-0.5">{cust.employeeId}</span> : '—'}
+                </td>
+                <td className="mono-label p-4">{cust.role ?? 'CUSTOMER'}</td>
+                <td className="p-4 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <button type="button" onClick={() => setHistoryCustomer(cust)} className={actionBtn}>
+                      History
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomerModal({
+                          id: cust.id,
+                          name: cust.name,
+                          email: cust.email,
+                          phone: cust.phone ?? '',
+                          employeeId: cust.employeeId ?? '',
+                        })
+                      }
+                      className={actionBtn}
+                    >
+                      Edit
+                    </button>
+                    {cust.role !== 'ADMIN' && (
+                      <button type="button" onClick={() => deactivateCustomer.mutate(cust.id)} className={dangerBtn}>
+                        Deactivate
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
         </div>
       )}
 
       {/* SLIDE-OVER SHEET: VEHICLE CREATE / EDIT */}
-      <SlideOver open={!!vehicleModal} onClose={() => setVehicleModal(null)}>
+      <FormSlideOver
+        open={!!vehicleModal}
+        title={vehicleModal?.id ? `Edit Vehicle #${vehicleModal.id}` : 'Create Vehicle'}
+        saveLabel="Save Vehicle"
+        pending={saveVehicle.isPending}
+        onClose={() => setVehicleModal(null)}
+        onSubmit={() => vehicleModal && saveVehicle.mutate(vehicleModal)}
+      >
         {vehicleModal && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              saveVehicle.mutate(vehicleModal)
-            }}
-            className="space-y-6"
-          >
-            <div className="flex items-center justify-between border-b border-hairline pb-4">
-              <p className="mono-label">{vehicleModal.id ? `Edit Vehicle #${vehicleModal.id}` : 'Create Vehicle'}</p>
-              <button type="button" className="mono-label" onClick={() => setVehicleModal(null)}>
-                Close
-              </button>
-            </div>
-
+          <>
             <Input
               label="Make & Model (e.g. Honda City)"
               value={vehicleModal.name}
               onChange={(e) => setVehicleModal({ ...vehicleModal, name: e.target.value })}
               required
             />
-
             <Input
               label="Daily Rate (₹)"
               type="number"
@@ -888,13 +804,12 @@ export default function Admin() {
               onChange={(e) => setVehicleModal({ ...vehicleModal, dailyRate: Number(e.target.value) })}
               required
             />
-
             <label className="block">
               <span className="mono-label text-muted-foreground">Category</span>
               <select
                 value={vehicleModal.categoryId}
                 onChange={(e) => setVehicleModal({ ...vehicleModal, categoryId: Number(e.target.value) })}
-                className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                className={selectClass}
               >
                 {categories.data?.map((cat) => (
                   <option key={cat.id} value={cat.id} className="bg-card text-ink">
@@ -903,7 +818,6 @@ export default function Admin() {
                 ))}
               </select>
             </label>
-
             <label className="flex min-h-11 cursor-pointer items-center justify-between border border-hairline bg-card px-4">
               <span className="text-sm font-medium">Available for rent</span>
               <input
@@ -913,43 +827,27 @@ export default function Admin() {
                 className="size-5 accent-[var(--odo-signal)]"
               />
             </label>
-
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setVehicleModal(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={saveVehicle.isPending}>
-                {saveVehicle.isPending ? 'Saving…' : 'Save Vehicle'}
-              </Button>
-            </div>
-          </form>
+          </>
         )}
-      </SlideOver>
+      </FormSlideOver>
 
       {/* SLIDE-OVER SHEET: CATEGORY CREATE / EDIT */}
-      <SlideOver open={!!categoryModal} onClose={() => setCategoryModal(null)}>
+      <FormSlideOver
+        open={!!categoryModal}
+        title={categoryModal?.id ? `Edit Category #${categoryModal.id}` : 'Create Category'}
+        saveLabel="Save Category"
+        pending={saveCategory.isPending}
+        onClose={() => setCategoryModal(null)}
+        onSubmit={() => categoryModal && saveCategory.mutate(categoryModal)}
+      >
         {categoryModal && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              saveCategory.mutate(categoryModal)
-            }}
-            className="space-y-6"
-          >
-            <div className="flex items-center justify-between border-b border-hairline pb-4">
-              <p className="mono-label">{categoryModal.id ? `Edit Category #${categoryModal.id}` : 'Create Category'}</p>
-              <button type="button" className="mono-label" onClick={() => setCategoryModal(null)}>
-                Close
-              </button>
-            </div>
-
+          <>
             <Input
               label="Category Name"
               value={categoryModal.name}
               onChange={(e) => setCategoryModal({ ...categoryModal, name: e.target.value })}
               required
             />
-
             <Input
               label="Category Discount % (0 to 50)"
               type="number"
@@ -959,43 +857,27 @@ export default function Admin() {
               onChange={(e) => setCategoryModal({ ...categoryModal, discountPercent: Number(e.target.value) })}
               required
             />
-
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCategoryModal(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={saveCategory.isPending}>
-                {saveCategory.isPending ? 'Saving…' : 'Save Category'}
-              </Button>
-            </div>
-          </form>
+          </>
         )}
-      </SlideOver>
+      </FormSlideOver>
 
       {/* SLIDE-OVER SHEET: COUPON CREATE / EDIT */}
-      <SlideOver open={!!couponModal} onClose={() => setCouponModal(null)}>
+      <FormSlideOver
+        open={!!couponModal}
+        title={couponModal?.id ? `Edit Coupon #${couponModal.id}` : 'Create Coupon'}
+        saveLabel="Save Coupon"
+        pending={saveCoupon.isPending}
+        onClose={() => setCouponModal(null)}
+        onSubmit={() => couponModal && saveCoupon.mutate(couponModal)}
+      >
         {couponModal && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              saveCoupon.mutate(couponModal)
-            }}
-            className="space-y-6"
-          >
-            <div className="flex items-center justify-between border-b border-hairline pb-4">
-              <p className="mono-label">{couponModal.id ? `Edit Coupon #${couponModal.id}` : 'Create Coupon'}</p>
-              <button type="button" className="mono-label" onClick={() => setCouponModal(null)}>
-                Close
-              </button>
-            </div>
-
+          <>
             <Input
               label="Coupon Code (uppercase)"
               value={couponModal.code}
               onChange={(e) => setCouponModal({ ...couponModal, code: e.target.value.toUpperCase() })}
               required
             />
-
             <label className="block">
               <span className="mono-label text-muted-foreground">Coupon Type</span>
               <select
@@ -1008,14 +890,13 @@ export default function Admin() {
                     discountPercent: nextType === 'FIRST_RENTAL' ? 50 : couponModal.discountPercent,
                   })
                 }}
-                className="mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal"
+                className={selectClass}
               >
                 <option value="FIRST_RENTAL" className="bg-card text-ink">FIRST_RENTAL (Must be 50%)</option>
                 <option value="DURATION" className="bg-card text-ink">DURATION (Requires min & max days)</option>
                 <option value="EMPLOYEE" className="bg-card text-ink">EMPLOYEE (Motherson staff)</option>
               </select>
             </label>
-
             <Input
               label="Discount Percent (1 to 50)"
               type="number"
@@ -1026,7 +907,6 @@ export default function Admin() {
               onChange={(e) => setCouponModal({ ...couponModal, discountPercent: Number(e.target.value) })}
               required
             />
-
             {couponModal.couponType === 'DURATION' && (
               <div className="grid grid-cols-2 gap-4">
                 <Input
@@ -1049,36 +929,21 @@ export default function Admin() {
                 />
               </div>
             )}
-
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCouponModal(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={saveCoupon.isPending}>
-                {saveCoupon.isPending ? 'Saving…' : 'Save Coupon'}
-              </Button>
-            </div>
-          </form>
+          </>
         )}
-      </SlideOver>
+      </FormSlideOver>
 
       {/* SLIDE-OVER SHEET: CUSTOMER CREATE / EDIT */}
-      <SlideOver open={!!customerModal} onClose={() => setCustomerModal(null)}>
+      <FormSlideOver
+        open={!!customerModal}
+        title={customerModal?.id ? `Edit Customer #${customerModal.id}` : 'Create Customer'}
+        saveLabel="Save Customer"
+        pending={saveCustomer.isPending}
+        onClose={() => setCustomerModal(null)}
+        onSubmit={() => customerModal && saveCustomer.mutate(customerModal)}
+      >
         {customerModal && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              saveCustomer.mutate(customerModal)
-            }}
-            className="space-y-6"
-          >
-            <div className="flex items-center justify-between border-b border-hairline pb-4">
-              <p className="mono-label">{customerModal.id ? `Edit Customer #${customerModal.id}` : 'Create Customer'}</p>
-              <button type="button" className="mono-label" onClick={() => setCustomerModal(null)}>
-                Close
-              </button>
-            </div>
-
+          <>
             <Input
               label="Full Name"
               value={customerModal.name}
@@ -1103,18 +968,9 @@ export default function Admin() {
               value={customerModal.employeeId}
               onChange={(e) => setCustomerModal({ ...customerModal, employeeId: e.target.value })}
             />
-
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="secondary" className="flex-1" onClick={() => setCustomerModal(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1" disabled={saveCustomer.isPending}>
-                {saveCustomer.isPending ? 'Saving…' : 'Save Customer'}
-              </Button>
-            </div>
-          </form>
+          </>
         )}
-      </SlideOver>
+      </FormSlideOver>
 
       {/* SLIDE-OVER SHEET: CUSTOMER RENTAL HISTORY */}
       <SlideOver open={!!historyCustomer} onClose={() => setHistoryCustomer(null)} maxWidth="max-w-lg">

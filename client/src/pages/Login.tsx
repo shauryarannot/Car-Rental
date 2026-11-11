@@ -1,8 +1,5 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useMutation } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { toast } from 'sonner'
@@ -12,23 +9,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
-const loginSchema = z.object({
-  email: z.string().trim().email('Enter a valid email address.'),
-  password: z.string().min(1, 'Enter your password.'),
-})
-
-const registerSchema = z.object({
-  name: z.string().trim().min(2, 'Enter your full name.'),
-  email: z.string().trim().email('Enter a valid email address.'),
-  password: z.string().min(6, 'Password must be at least 6 characters.'),
-  phone: z.string().trim().optional(),
-  employeeId: z.string().trim().optional(),
-})
-
-type LoginForm = z.infer<typeof loginSchema>
-type RegisterForm = z.infer<typeof registerSchema>
-
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const alertClass = 'flex items-center gap-2 border border-red-deep/40 bg-[var(--odo-red-tint)] px-3 py-2 text-sm text-red-deep'
+
+interface LoginFields {
+  email: string
+  password: string
+}
+
+interface RegisterFields extends LoginFields {
+  name: string
+  phone: string
+  employeeId: string
+}
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -38,52 +31,69 @@ export default function Login() {
 
   const from = (location.state as { from?: string } | null)?.from
 
-  const loginForm = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
-  })
+  const [loginData, setLoginData] = useState<LoginFields>({ email: '', password: '' })
+  const [loginErrors, setLoginErrors] = useState<Partial<LoginFields>>({})
 
-  const registerForm = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: { name: '', email: '', password: '', phone: '', employeeId: '' },
+  const [regData, setRegData] = useState<RegisterFields>({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    employeeId: '',
   })
+  const [regErrors, setRegErrors] = useState<Partial<RegisterFields>>({})
 
   const signInMutation = useMutation({
-    mutationFn: (data: LoginForm) => api.login(data),
+    mutationFn: (data: LoginFields) => api.login(data),
     onSuccess: (res, vars) => {
       login(res, vars.email)
       toast.success('Signed in successfully.')
-      if (from && from !== '/login') {
-        navigate(from, { replace: true })
-      } else {
-        navigate(res.role === 'ADMIN' ? '/admin' : '/', { replace: true })
-      }
+      navigate(from && from !== '/login' ? from : res.role === 'ADMIN' ? '/admin' : '/', { replace: true })
     },
-    onError: (e) => {
-      toast.error(isApiError(e) ? e.message : 'Invalid email or password.')
-    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : 'Invalid email or password.'),
   })
 
   const registerMutation = useMutation({
-    mutationFn: async (data: RegisterForm) => {
+    mutationFn: async (data: RegisterFields) => {
       await api.register({
-        name: data.name,
-        email: data.email,
+        name: data.name.trim(),
+        email: data.email.trim(),
         password: data.password,
-        phone: data.phone || undefined,
-        employeeId: data.employeeId || undefined,
+        phone: data.phone.trim() || undefined,
+        employeeId: data.employeeId.trim() || undefined,
       })
-      return api.login({ email: data.email, password: data.password })
+      return api.login({ email: data.email.trim(), password: data.password })
     },
     onSuccess: (res, vars) => {
-      login(res, vars.email, vars.employeeId)
+      login(res, vars.email.trim(), vars.employeeId)
       toast.success('Account created. Welcome aboard.')
       navigate('/', { replace: true })
     },
-    onError: (e) => {
-      toast.error(isApiError(e) ? e.message : 'Could not register account.')
-    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not register account.'),
   })
+
+  const handleLoginSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const errs: Partial<LoginFields> = {}
+    if (!EMAIL_RE.test(loginData.email.trim())) errs.email = 'Enter a valid email address.'
+    if (!loginData.password) errs.password = 'Enter your password.'
+    setLoginErrors(errs)
+    if (!Object.keys(errs).length) {
+      signInMutation.mutate({ email: loginData.email.trim(), password: loginData.password })
+    }
+  }
+
+  const handleRegisterSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    const errs: Partial<RegisterFields> = {}
+    if (regData.name.trim().length < 2) errs.name = 'Enter your full name.'
+    if (!EMAIL_RE.test(regData.email.trim())) errs.email = 'Enter a valid email address.'
+    if (regData.password.length < 6) errs.password = 'Password must be at least 6 characters.'
+    setRegErrors(errs)
+    if (!Object.keys(errs).length) {
+      registerMutation.mutate(regData)
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-[1440px] items-center px-6 py-16">
@@ -125,27 +135,24 @@ export default function Login() {
           </div>
 
           {mode === 'login' ? (
-            <form
-              key="login-form"
-              onSubmit={loginForm.handleSubmit((d) => signInMutation.mutate(d))}
-              className="mt-8 space-y-6"
-              noValidate
-            >
+            <form key="login-form" onSubmit={handleLoginSubmit} className="mt-8 space-y-6" noValidate>
               <Input
                 label="Email address"
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                error={loginForm.formState.errors.email?.message}
-                {...loginForm.register('email')}
+                value={loginData.email}
+                error={loginErrors.email}
+                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
               />
               <Input
                 label="Password"
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                error={loginForm.formState.errors.password?.message}
-                {...loginForm.register('password')}
+                value={loginData.password}
+                error={loginErrors.password}
+                onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
               />
 
               {signInMutation.isError && (
@@ -160,34 +167,32 @@ export default function Login() {
               </Button>
             </form>
           ) : (
-            <form
-              key="register-form"
-              onSubmit={registerForm.handleSubmit((d) => registerMutation.mutate(d))}
-              className="mt-8 space-y-5"
-              noValidate
-            >
+            <form key="register-form" onSubmit={handleRegisterSubmit} className="mt-8 space-y-5" noValidate>
               <Input
                 label="Full name"
                 autoComplete="name"
                 placeholder="Your full name"
-                error={registerForm.formState.errors.name?.message}
-                {...registerForm.register('name')}
+                value={regData.name}
+                error={regErrors.name}
+                onChange={(e) => setRegData({ ...regData, name: e.target.value })}
               />
               <Input
                 label="Email address"
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                error={registerForm.formState.errors.email?.message}
-                {...registerForm.register('email')}
+                value={regData.email}
+                error={regErrors.email}
+                onChange={(e) => setRegData({ ...regData, email: e.target.value })}
               />
               <Input
                 label="Password"
                 type="password"
                 autoComplete="new-password"
                 placeholder="At least 6 characters"
-                error={registerForm.formState.errors.password?.message}
-                {...registerForm.register('password')}
+                value={regData.password}
+                error={regErrors.password}
+                onChange={(e) => setRegData({ ...regData, password: e.target.value })}
               />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Input
@@ -195,14 +200,14 @@ export default function Login() {
                   type="tel"
                   autoComplete="tel"
                   placeholder="+91 98…"
-                  error={registerForm.formState.errors.phone?.message}
-                  {...registerForm.register('phone')}
+                  value={regData.phone}
+                  onChange={(e) => setRegData({ ...regData, phone: e.target.value })}
                 />
                 <Input
                   label="Employee ID (optional)"
                   placeholder="For staff offers"
-                  error={registerForm.formState.errors.employeeId?.message}
-                  {...registerForm.register('employeeId')}
+                  value={regData.employeeId}
+                  onChange={(e) => setRegData({ ...regData, employeeId: e.target.value })}
                 />
               </div>
 

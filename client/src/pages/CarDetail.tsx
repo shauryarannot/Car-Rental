@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
-import { MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
 
 function couponDescription(c: DiscountCoupon) {
@@ -259,7 +259,7 @@ export default function CarDetail() {
                         onChange={(e) => setDays(clampDays(Number(e.target.value)))}
                         className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
                       >
-                        {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+                        {DURATION_DAYS.map((d) => (
                           <option key={d} value={d} className="bg-card text-ink">
                             {d} {d === 1 ? 'day' : 'days'} — {formatINR(c.pricePerDay * d)}
                           </option>

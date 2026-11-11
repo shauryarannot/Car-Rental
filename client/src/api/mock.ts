@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns'
+import { daysBetween, returnDateFor, today } from '@/lib/trip'
 import { vehicleToCar } from './http'
 import type { Api, Category, Customer, DiscountCoupon, Rental, Vehicle } from './types'
 
@@ -74,17 +74,16 @@ export const mockApi: Api = {
   listCategories: () => wait([...cats]),
   listCoupons: () => wait([...coupons]),
   async createBooking(req) {
-    const days = differenceInCalendarDays(parseISO(req.endDate), parseISO(req.startDate))
+    const days = daysBetween(req.startDate, req.endDate)
     if (days < 1) throw fail(400, 'Return date must be after pick-up.')
     const v = vehicles.find((x) => x.id === req.vehicleId)
     if (!v) throw fail(404, `Vehicle ${req.vehicleId} not found`)
     if (!v.available) throw fail(400, 'Vehicle is not available')
     const customer = customers[1]
     const pct = req.benefit === 'CATEGORY_DISCOUNT' ? v.category.discountPercent : 0
-    const today = format(new Date(), 'yyyy-MM-dd')
     const rental: Rental = {
       id: ++rid, customer, vehicle: v, days,
-      startDate: today, endDate: format(addDays(new Date(), days), 'yyyy-MM-dd'),
+      startDate: today(), endDate: returnDateFor(days),
       status: 'ACTIVE', benefitType: req.benefit ?? 'NONE', couponCode: req.couponCode ?? null,
       discountPercent: pct, totalAmount: v.dailyRate * days * (1 - pct / 100),
     }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { SectionHeader } from '@/components/ui/section-header'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { useCars, useCategories, useCoupons } from '@/hooks/queries'
-import { MAX_DAYS, returnDateFor, daysUntil, clampDays, prettyDate } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, returnDateFor, daysUntil, clampDays, prettyDate } from '@/lib/trip'
 import { cn } from '@/lib/utils'
 
 const ease = [0.22, 1, 0.36, 1] as const
@@ -39,7 +39,7 @@ function SearchBar() {
           onChange={(e) => setDays(clampDays(Number(e.target.value)))}
           className="mt-1 w-full cursor-pointer bg-card font-medium text-ink outline-none"
         >
-          {Array.from({ length: MAX_DAYS }, (_, i) => i + 1).map((d) => (
+          {DURATION_DAYS.map((d) => (
             <option key={d} value={d} className="bg-card text-ink">
               {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d))})
             </option>
