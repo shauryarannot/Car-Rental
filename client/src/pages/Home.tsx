@@ -92,6 +92,14 @@ export default function Home() {
     () => [...available].sort((a, b) => Number(!!b.imageUrl) - Number(!!a.imageUrl) || b.pricePerDay - a.pricePerDay).slice(0, 6),
     [available],
   )
+  const employeeCoupons = useMemo(
+    () => coupons.data?.filter((c) => c.couponType === 'EMPLOYEE') ?? [],
+    [coupons.data],
+  )
+  const generalCoupons = useMemo(
+    () => coupons.data?.filter((c) => c.couponType !== 'EMPLOYEE') ?? [],
+    [coupons.data],
+  )
 
   return (
     <>
@@ -149,6 +157,106 @@ export default function Home() {
           >
             <SearchBar />
           </motion.div>
+        </div>
+      </section>
+
+      {/* Motherson Employee Benefits Promotional Banner */}
+      <section aria-labelledby="motherson-benefits-heading" className="mx-auto max-w-[1440px] px-6 pt-16">
+        <div className="ticks relative overflow-hidden border border-hairline bg-card p-6 sm:p-10">
+          <div className="grid items-center gap-8 lg:grid-cols-12">
+            <div className="lg:col-span-7">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mono-label border border-red-deep/40 bg-[var(--odo-red-tint)] px-2.5 py-1 text-red-deep">
+                  Motherson Corporate Perks
+                </span>
+                <span className="mono-label border border-hairline bg-background px-2.5 py-1 text-ink">
+                  Multi-Use · Reusable Benefit
+                </span>
+              </div>
+
+              <h2
+                id="motherson-benefits-heading"
+                className="mt-4 text-[clamp(2rem,4vw,3.25rem)] font-extrabold leading-[0.98] tracking-[-0.03em]"
+              >
+                Exclusive Benefits for{' '}
+                <span className="serif-italic font-normal text-red-deep">Motherson Employees</span>
+              </h2>
+
+              <p className="mt-3 max-w-2xl text-base italic text-muted-foreground sm:text-lg">
+                Enjoy special discounts on your car rentals. Your employee benefits can be used across multiple bookings!
+              </p>
+
+              <ul className="mt-6 flex flex-wrap gap-3 text-xs sm:text-sm">
+                {[
+                  'Reusable on every booking',
+                  'No minimum or maximum trip-day limits',
+                  'Valid across all vehicle categories',
+                ].map((perk) => (
+                  <li
+                    key={perk}
+                    className="flex items-center gap-2 border border-hairline bg-background px-3 py-1.5 font-medium text-ink"
+                  >
+                    <span aria-hidden className="size-1.5 bg-red-deep" />
+                    {perk}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-6 flex flex-wrap items-center gap-4">
+                <Button asChild arrow>
+                  <Link to="/fleet">Explore Fleet & Redeem</Link>
+                </Button>
+                <span className="mono-label text-muted-foreground">
+                  Select “Coupon code” at checkout to apply your employee pass
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:col-span-5">
+              {(employeeCoupons.length > 0
+                ? employeeCoupons
+                : [
+                    { id: -1, code: 'MOTHERSON20', couponType: 'EMPLOYEE' as const, discountPercent: 20 },
+                    { id: -2, code: 'STAFF30', couponType: 'EMPLOYEE' as const, discountPercent: 30 },
+                  ]
+              ).map((c) => (
+                <div
+                  key={c.code}
+                  className="ticks flex flex-col justify-between border border-dashed border-red-deep/50 bg-background p-5 transition-colors duration-200 hover:border-red-deep"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="mono-label text-red-deep">Employee Pass</span>
+                      <span className="mono-label border border-red-deep/30 bg-[var(--odo-red-tint)] px-2 py-0.5 text-[10px] text-red-deep">
+                        Multi-use
+                      </span>
+                    </div>
+                    <p className="mono mt-4 text-4xl font-semibold text-red-deep sm:text-5xl">
+                      {Number(c.discountPercent)}% <span className="text-lg font-normal">OFF</span>
+                    </p>
+                  </div>
+
+                  <div className="mt-6 border-t border-hairline pt-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="mono-label text-muted-foreground">Code</span>
+                      <span className="mono border border-hairline bg-card px-2 py-0.5 text-sm font-semibold text-ink">
+                        {c.code}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Exclusive Motherson employee rate · Reusable across multiple bookings.
+                    </p>
+                    <Link
+                      to="/fleet"
+                      className="mono-label mt-3 inline-block text-red-deep underline-offset-4 hover:underline"
+                    >
+                      Book with {c.code} →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -219,18 +327,17 @@ export default function Home() {
       </section>
 
       {/* Offers */}
-      {coupons.data && coupons.data.length > 0 && (
+      {generalCoupons.length > 0 && (
         <section className="mx-auto max-w-[1440px] px-6 py-24">
           <SectionHeader n={4} label="Offers" />
-          <ul className="mt-8 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {coupons.data.slice(0, 4).map((c) => (
+          <ul className="mt-8 grid items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {generalCoupons.map((c) => (
               <li key={c.id} className="ticks flex h-full flex-col justify-between border border-dashed border-hairline bg-card p-6">
                 <p className="mono text-4xl font-medium text-red-deep">{Number(c.discountPercent)}%</p>
                 <div className="mt-6">
                   <p className="mono-label">{c.code}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {c.couponType === 'FIRST_RENTAL' && 'Your first rental.'}
-                    {c.couponType === 'EMPLOYEE' && 'Motherson employees.'}
                     {c.couponType === 'DURATION' && `Trips of ${c.minDays}–${c.maxDays} days.`}
                   </p>
                 </div>

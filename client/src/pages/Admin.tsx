@@ -304,7 +304,7 @@ export default function Admin() {
           Administrator access <span className="serif-italic font-normal text-red-deep">only.</span>
         </h1>
         <p className="mt-4 max-w-lg text-muted-foreground">
-          You are currently signed in as {user?.name ?? 'a guest'} ({user?.role ?? 'UNAUTHENTICATED'}). Sign in with an ADMIN account (admin@carrental.com) to manage vehicles, categories, coupons, and customers.
+          You are currently signed in as {user?.name ?? 'a guest'} ({user?.role ?? 'UNAUTHENTICATED'}). Sign in with an ADMIN account to manage vehicles, categories, coupons, and customers.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild arrow>

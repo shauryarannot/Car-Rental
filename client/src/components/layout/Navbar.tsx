@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'motion/react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/app/theme'
 import { useAuth } from '@/app/auth'
@@ -10,9 +9,9 @@ import { cn } from '@/lib/utils'
 /** Fixed top navbar with role-based navigation (Customer vs Admin) and scroll progress hairline. */
 export function Navbar() {
   const { theme, toggle } = useTheme()
-  const { user, isAdmin, isCustomer, logout } = useAuth()
+  const { user, isAdmin, isCustomer, isEmployee, logout } = useAuth()
+  const roleLabel = isEmployee ? 'Motherson' : user?.role
   const navigate = useNavigate()
-  const qc = useQueryClient()
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const { scrollYProgress } = useScroll()
@@ -33,7 +32,6 @@ export function Navbar() {
 
   const handleLogout = () => {
     logout()
-    qc.clear()
     setOpen(false)
     navigate('/login')
   }
@@ -91,7 +89,7 @@ export function Navbar() {
                         : 'bg-white/20 text-white',
                   )}
                 >
-                  {user.role}
+                  {roleLabel}
                 </span>
                 <span className="mono-label max-w-36 truncate">{user.name}</span>
               </div>
@@ -143,7 +141,7 @@ export function Navbar() {
           {user ? (
             <li className="mt-2 border-t border-hairline pt-3">
               <p className="mono-label text-muted-foreground">
-                Signed in as {user.name} ({user.role})
+                Signed in as {user.name} ({roleLabel})
               </p>
               <button type="button" onClick={handleLogout} className="mono-label mt-2 min-h-11 text-red-deep">
                 Sign out →
