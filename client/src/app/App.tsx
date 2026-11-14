@@ -8,6 +8,7 @@ import type { Role } from '@/api/types'
 import { Shell } from '@/components/layout/Shell'
 import Home from '@/pages/Home'
 import Login from '@/pages/Login'
+import Signup from '@/pages/Signup'
 import NotFound from '@/pages/NotFound'
 
 const Fleet = lazy(() => import('@/pages/Fleet'))
@@ -43,8 +44,9 @@ const router = createBrowserRouter([
   {
     element: <Shell />,
     children: [
+      { path: '/', element: <Home /> },
       { path: '/login', element: <Login /> },
-      { path: '/', element: <RequireAuth><Home /></RequireAuth> },
+      { path: '/signup', element: <Signup /> },
       { path: '/fleet', element: <RequireAuth>{page(<Fleet />)}</RequireAuth> },
       { path: '/fleet/:id', element: <RequireAuth>{page(<CarDetail />)}</RequireAuth> },
       { path: '/book/:id', element: <RequireAuth><BookRedirect /></RequireAuth> },

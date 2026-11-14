@@ -101,17 +101,17 @@ export default function Fleet() {
   )
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 pb-24">
+    <div className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6 sm:pb-24">
       {/* Top filter bar (normal flow at the top of the page, never floating mid-screen) */}
-      <div className="-mx-6 border-b border-hairline bg-card px-6 py-4">
-        <div className="flex flex-wrap items-center gap-4">
+      <div className="-mx-4 border-b border-hairline bg-card px-4 py-4 sm:-mx-6 sm:px-6">
+        <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Duration</span>
             <select
               value={days}
               onChange={(e) => set('days', String(clampDays(Number(e.target.value))))}
               aria-label="Trip duration in days"
-              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+              className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
             >
               {DURATION_DAYS.map((d) => (
                 <option key={d} value={d} className="bg-card text-ink">
@@ -129,7 +129,7 @@ export default function Fleet() {
               min={returnDateFor(1)}
               max={returnDateFor(MAX_DAYS)}
               onChange={(e) => e.target.value && set('days', String(clampDays(daysUntil(e.target.value))))}
-              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+              className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
               aria-label={`Return date, ${prettyDate(returnDateFor(days))}`}
             />
           </label>
@@ -140,12 +140,28 @@ export default function Fleet() {
               value={category}
               onChange={(e) => set('category', e.target.value || null)}
               aria-label="Filter by category"
-              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+              className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
             >
               <option value="" className="bg-card text-ink">All categories</option>
               {cats.data?.map((c) => (
                 <option key={c.id} value={String(c.id)} className="bg-card text-ink">
                   {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Sort by</span>
+            <select
+              value={sort}
+              onChange={(e) => set('sort', e.target.value === 'relevance' ? null : e.target.value)}
+              aria-label="Sort"
+              className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+            >
+              {sorts.map((s) => (
+                <option key={s.v} value={s.v} className="bg-card text-ink">
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -157,36 +173,20 @@ export default function Fleet() {
             onChange={(e) => set('q', e.target.value)}
             placeholder="Search a model…"
             aria-label="Search a model"
-            className="min-h-12 flex-1 border border-hairline bg-card px-3 text-sm text-ink outline-none focus:border-signal sm:max-w-xs"
+            className="col-span-2 min-h-12 flex-1 border border-hairline bg-card px-3 text-sm text-ink outline-none focus:border-signal sm:min-w-44 sm:max-w-xs"
           />
 
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
-            <span className="mono-label text-muted-foreground">Sort by</span>
-            <select
-              value={sort}
-              onChange={(e) => set('sort', e.target.value === 'relevance' ? null : e.target.value)}
-              aria-label="Sort"
-              className="mt-0.5 cursor-pointer bg-card text-sm font-medium text-ink outline-none"
-            >
-              {sorts.map((s) => (
-                <option key={s.v} value={s.v} className="bg-card text-ink">
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <button type="button" className="mono-label min-h-12 border border-hairline bg-card px-4 lg:hidden" onClick={() => setShowFilters(true)}>
+          <button type="button" className="mono-label col-span-2 min-h-11 border border-hairline bg-card px-4 sm:min-h-12 lg:hidden" onClick={() => setShowFilters(true)}>
             Filters
           </button>
         </div>
       </div>
 
-      <h1 className="pt-12 text-[clamp(3rem,7vw,6rem)] font-extrabold leading-none tracking-[-0.03em]">
+      <h1 className="pt-8 text-[clamp(2.5rem,7vw,6rem)] font-extrabold leading-none tracking-[-0.03em] sm:pt-12">
         The fleet<sup className="mono ml-2 align-super text-base font-normal text-muted-foreground">{list.length}</sup>
       </h1>
 
-      <div className="mt-10 grid gap-10 lg:grid-cols-[280px_1fr]">
+      <div className="mt-8 grid gap-8 sm:mt-10 sm:gap-10 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]">
         <aside className="hidden lg:block">
           <div className="sticky top-20">{filters}</div>
         </aside>

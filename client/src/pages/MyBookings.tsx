@@ -75,15 +75,15 @@ export default function MyBookings() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-16">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mono-label text-muted-foreground">
             Customer Account · {user?.name} ({user?.email})
           </p>
-          <h1 className="mt-2 text-[clamp(3rem,7vw,5.5rem)] font-extrabold leading-none tracking-[-0.03em]">My bookings</h1>
+          <h1 className="mt-2 text-[clamp(2.5rem,7vw,5.5rem)] font-extrabold leading-none tracking-[-0.03em]">My bookings</h1>
         </div>
-        <Button asChild variant="secondary">
+        <Button asChild variant="secondary" className="w-full sm:w-auto">
           <Link to="/fleet">Book another car →</Link>
         </Button>
       </div>
@@ -128,10 +128,10 @@ export default function MyBookings() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: 40 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 10) * 0.04 }}
-                className="grid items-center gap-4 border border-hairline bg-card sm:grid-cols-[200px_1fr_auto]"
+                className="grid items-center gap-4 border border-hairline bg-card md:grid-cols-[200px_1fr_auto]"
               >
                 <CarImage src={car.imageUrl} alt={car.name} category={car.category.name} className="aspect-[16/10] w-full" />
-                <div className="p-4 sm:py-4 sm:pl-2">
+                <div className="min-w-0 p-4 md:py-4 md:pl-2">
                   <div className="flex flex-wrap items-center gap-3">
                     <Link to={`/bookings/${r.id}`} className="mono text-sm font-medium hover:underline">{bookingRef(r.id)}</Link>
                     <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
@@ -140,7 +140,7 @@ export default function MyBookings() {
                   <p className="display-condensed mt-2 truncate text-3xl">{car.name}</p>
                   <p className="mono-label mt-1 text-muted-foreground">{prettyDate(r.startDate)} → {prettyDate(r.endDate)} · {r.days} days</p>
                 </div>
-                <div className="flex items-center justify-between gap-4 border-t border-hairline p-4 sm:flex-col sm:items-end sm:border-0">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-hairline p-4 md:flex-col md:items-end md:border-0">
                   <p className="mono text-xl font-medium">{formatINR(Number(r.totalAmount))}</p>
                   <div className="flex items-center gap-2">
                     <Button asChild variant="ghost" className="min-h-9 px-3 text-xs">

@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
-import { DURATION_DAYS, MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { MAX_DAYS, DURATION_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { BRANCH } from '@/lib/location'
 import { cn, formatINR } from '@/lib/utils'
 
 function couponDescription(c: DiscountCoupon) {
@@ -168,32 +169,32 @@ export default function CarDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 pb-24">
-      <nav aria-label="Breadcrumb" className="mono-label py-6 text-muted-foreground">
+    <div className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6 sm:pb-24">
+      <nav aria-label="Breadcrumb" className="mono-label py-4 text-muted-foreground sm:py-6">
         <Link to="/fleet" className="hover:text-ink">Fleet</Link> / <span>{c.category.name}</span> / <span className="text-ink">{c.name}</span>
       </nav>
 
-      <div className="grid gap-12 lg:grid-cols-12">
+      <div className="grid gap-8 sm:gap-12 lg:grid-cols-12">
         {/* Left: image + facts */}
         <div className="lg:col-span-7">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }} className="ticks relative border border-hairline">
             <CarImage src={c.imageUrl} alt={c.name} category={c.category.name} eager grey={!c.available} className="aspect-[16/10]" />
             {!c.available && (
-              <span className="mono absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-6 border-2 border-red-deep bg-card/90 px-6 py-3 text-xl font-bold tracking-widest text-red-deep">
+              <span className="mono absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-6 border-2 border-red-deep bg-card/90 px-4 py-2 text-center text-sm font-bold tracking-widest text-red-deep sm:px-6 sm:py-3 sm:text-xl">
                 OUT ON THE ROAD
               </span>
             )}
           </motion.div>
-          <dl className="mt-8 grid grid-cols-2 border-y border-hairline sm:grid-cols-4">
+          <dl className="mt-6 grid grid-cols-2 border-y border-hairline sm:mt-8 sm:grid-cols-4">
             {[
               ['Category', c.category.name],
               ['Daily rate', formatINR(c.pricePerDay)],
               ['Max trip', `${MAX_DAYS} days`],
               ['Status', c.available ? 'Available' : 'Out'],
             ].map(([k, v], i) => (
-              <div key={k} className={cn('p-4', i > 0 && 'sm:border-l border-hairline', i % 2 === 1 && 'border-l')}>
+              <div key={k} className={cn('p-4', i > 0 && 'sm:border-l border-hairline', i % 2 === 1 && 'border-l', i >= 2 && 'border-t sm:border-t-0')}>
                 <dt className="mono-label text-muted-foreground">{k}</dt>
-                <dd className="mono mt-2 text-lg">{v}</dd>
+                <dd className="mono mt-2 text-base sm:text-lg">{v}</dd>
               </div>
             ))}
           </dl>
@@ -203,15 +204,15 @@ export default function CarDetail() {
         <div className="lg:col-span-5">
           <div className="lg:sticky lg:top-20">
             <p className="mono-label text-muted-foreground">{c.make}</p>
-            <h1 className="display-condensed mt-2 text-[clamp(3rem,6vw,5.5rem)]">{c.model}</h1>
-            <div className="mt-4 flex items-center gap-4">
+            <h1 className="display-condensed mt-2 text-[clamp(2.5rem,6vw,5.5rem)]">{c.model}</h1>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
               <Counter value={c.pricePerDay} prefix="₹ " suffix=" / day" className="text-2xl" />
               <StatusPill status={c.available ? 'available' : 'out'} />
             </div>
 
             {isAdmin ? (
               <div className="mt-8 space-y-6 border-t border-hairline pt-8">
-                <div className="flex items-center justify-between border border-hairline bg-card px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border border-hairline bg-card px-4 py-3">
                   <div>
                     <p className="mono-label text-red-deep">ROLE · ADMIN</p>
                     <p className="text-sm font-medium">Fleet Management Controls</p>
@@ -238,13 +239,13 @@ export default function CarDetail() {
               >
                 {/* Authenticated Customer Identity Readout */}
                 {user && isCustomer && (
-                  <div className="flex items-center justify-between border border-hairline bg-card px-4 py-3">
-                    <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border border-hairline bg-card px-4 py-3">
+                    <div className="min-w-0">
                       <p className="mono-label text-muted-foreground">Authenticated Driver · {user.role}</p>
-                      <p className="font-medium text-ink">{user.name}</p>
-                      <p className="mono text-xs text-muted-foreground">{user.email}</p>
+                      <p className="truncate font-medium text-ink">{user.name}</p>
+                      <p className="mono truncate text-xs text-muted-foreground">{user.email}</p>
                     </div>
-                    <span className="mono-label border border-hairline px-2 py-1 text-pit">Verified JWT</span>
+                    <span className="mono-label shrink-0 border border-hairline px-2 py-1 text-pit">Verified JWT</span>
                   </div>
                 )}
 
@@ -281,6 +282,9 @@ export default function CarDetail() {
                       <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days))}</span>
                     </label>
                   </div>
+                  <p className="mono-label mt-3 text-muted-foreground">
+                    Pick-up & drop-off · <span className="text-ink">{BRANCH.address}</span>
+                  </p>
                 </fieldset>
 
                 {/* Offer */}
@@ -302,7 +306,7 @@ export default function CarDetail() {
                     </select>
                   </label>
 
-                  <div className="mt-3 grid grid-cols-2 items-stretch gap-2">
+                  <div className="mt-3 grid grid-cols-1 items-stretch gap-2 sm:grid-cols-2">
                     {benefits.map((b) => (
                       <button
                         key={b.v}

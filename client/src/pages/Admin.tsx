@@ -69,7 +69,7 @@ function SlideOver({
             role="dialog"
             aria-modal
             className={cn(
-              'relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-8',
+              'relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto border-l border-hairline bg-background p-6 sm:p-8',
               maxWidth,
             )}
             initial={{ x: '100%' }}
@@ -401,51 +401,55 @@ export default function Admin() {
   ]
 
   return (
-    <div className="mx-auto max-w-[1440px] px-6 py-12 pb-24">
+    <div className="mx-auto max-w-[1440px] px-4 pb-16 pt-10 sm:px-6 sm:pb-24 sm:pt-14">
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-hairline pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-6 sm:gap-6 sm:pb-8">
         <div>
           <p className="mono-label text-red-deep">ROLE · ADMIN — CONTROL INSTRUMENT</p>
-          <h1 className="mt-2 text-[clamp(2.5rem,5vw,4.5rem)] font-extrabold leading-none tracking-[-0.03em]">
+          <h1 className="mt-2 pt-1 text-[clamp(2.25rem,5vw,4.5rem)] font-extrabold leading-[1.08] tracking-[-0.03em]">
             Fleet & Operations
           </h1>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={openNewVehicleModal} arrow>
+        <div className="flex w-full flex-wrap gap-3 sm:w-auto">
+          <Button onClick={openNewVehicleModal} arrow className="flex-1 sm:flex-initial">
             + Add vehicle
           </Button>
-          <Button variant="secondary" onClick={openNewCouponModal}>
+          <Button variant="secondary" onClick={openNewCouponModal} className="flex-1 sm:flex-initial">
             + Add coupon
           </Button>
         </div>
       </div>
 
       {/* Night Drive Instrument Readout Band */}
-      <div className="night-drive mt-8 grid grid-cols-2 border border-hairline bg-[var(--odo-bg)] text-[var(--odo-text)] lg:grid-cols-4">
+      <div className="night-drive mt-8 grid grid-cols-1 gap-px border border-hairline bg-[var(--odo-hairline)] text-[var(--odo-text)] sm:grid-cols-2 lg:grid-cols-5">
         {[
-          { label: 'Cumulative Revenue', value: stats.revenue, prefix: '₹ ', sub: `Across ${stats.totalRentals} rentals` },
-          { label: 'Active on the road', value: stats.activeCount, suffix: ' cars', sub: 'Currently dispatched' },
-          { label: 'Available on the lot', value: stats.availCars, suffix: ` / ${stats.totalCars}`, sub: 'Ready for immediate booking' },
-          { label: 'Active Customers & Offers', value: customers.data?.length ?? 0, suffix: ` · ${coupons.data?.length ?? 0} coupons`, sub: 'Verified accounts' },
+          { label: 'Cumulative Revenue', value: stats.revenue, prefix: '₹', sub: `Across ${stats.totalRentals} rentals` },
+          { label: 'Active on the Road', value: stats.activeCount, suffix: ' Cars', sub: 'Currently dispatched' },
+          { label: 'Available on the Lot', value: stats.availCars, suffix: ` / ${stats.totalCars}`, sub: 'Ready for immediate booking' },
+          { label: 'Active Customers', value: customers.data?.length ?? 0, sub: 'Verified accounts' },
+          { label: 'Active Coupons', value: coupons.data?.length ?? 0, sub: 'Available offers' },
         ].map((s, i) => (
           <div
             key={s.label}
             className={cn(
-              'border-hairline p-6',
-              i < 2 && 'border-b lg:border-b-0',
-              i % 2 === 0 && 'border-r',
-              i === 1 && 'lg:border-r',
+              'flex flex-col justify-between bg-[var(--odo-bg)] p-5 sm:p-6',
+              i === 4 && 'sm:col-span-2 lg:col-span-1',
             )}
           >
             <p className="mono-label text-[var(--odo-muted)]">{s.label}</p>
-            <Counter value={s.value} prefix={s.prefix} suffix={s.suffix} className="glow mt-3 text-3xl font-medium text-[var(--odo-amber)]" />
-            <p className="mono-label mt-2 text-[var(--odo-muted)]">{s.sub}</p>
+            <Counter
+              value={s.value}
+              prefix={s.prefix}
+              suffix={s.suffix}
+              className="glow my-4 whitespace-nowrap text-2xl font-medium text-[var(--odo-amber)] xl:text-[1.75rem]"
+            />
+            <p className="mono-label text-[var(--odo-muted)]">{s.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Section Tabs */}
-      <div role="tablist" className="mt-10 flex flex-wrap border-b border-hairline">
+      <div role="tablist" className="mt-8 flex items-center gap-2 overflow-x-auto border-b border-hairline sm:mt-10 sm:gap-4">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -454,12 +458,16 @@ export default function Admin() {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              'relative min-h-12 px-5 text-sm font-medium transition-colors',
+              'relative inline-flex min-h-12 shrink-0 items-center gap-2.5 whitespace-nowrap px-4 text-sm font-medium leading-none transition-colors sm:px-5',
               tab === t.id ? 'text-ink' : 'text-muted-foreground hover:text-ink',
             )}
           >
-            {t.label}
-            {t.count !== undefined && <span className="mono ml-2 text-xs text-muted-foreground">{t.count}</span>}
+            <span>{t.label}</span>
+            {t.count !== undefined && (
+              <span className="mono inline-flex items-center text-xs leading-none text-muted-foreground">
+                {t.count}
+              </span>
+            )}
             {tab === t.id && <motion.span layoutId="admin-tab" className="absolute inset-x-0 -bottom-px h-0.5 bg-signal" />}
           </button>
         ))}

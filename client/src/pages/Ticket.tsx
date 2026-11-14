@@ -9,6 +9,7 @@ import { StatusPill } from '@/components/ui/status-pill'
 import { vehicleToCar } from '@/api/http'
 import { bookingRef, formatINR } from '@/lib/utils'
 import { prettyDate } from '@/lib/trip'
+import { BRANCH, BRANCH_DIRECTIONS } from '@/lib/location'
 
 function computeBarcodeBars(seed: number): number[] {
   let x = seed * 9301 + 49297
@@ -22,8 +23,8 @@ function computeBarcodeBars(seed: number): number[] {
 function Barcode({ seed }: { seed: number }) {
   const bars = computeBarcodeBars(seed)
   return (
-    <div aria-hidden className="flex h-14 items-stretch gap-[2px]">
-      {bars.map((w, i) => <span key={i} className="bg-ink" style={{ width: w }} />)}
+    <div aria-hidden className="flex h-14 max-w-full items-stretch gap-[2px] overflow-hidden">
+      {bars.map((w, i) => <span key={i} className="shrink-0 bg-ink" style={{ width: w }} />)}
     </div>
   )
 }
@@ -34,6 +35,7 @@ function downloadIcs(r: Rental) {
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ryde.exe//Car Rental//EN', 'BEGIN:VEVENT',
     `UID:${bookingRef(r.id)}@ryde.exe`, `DTSTART;VALUE=DATE:${d(r.startDate)}`, `DTEND;VALUE=DATE:${d(r.endDate)}`,
     `SUMMARY:${r.vehicle.name} rental (${bookingRef(r.id)})`, `DESCRIPTION:Total ${formatINR(Number(r.totalAmount))}`,
+    `LOCATION:${BRANCH.address.replace(/,/g, '\\,')}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n')
   const a = document.createElement('a')
@@ -62,20 +64,20 @@ export default function Ticket() {
   const discount = Number(r.discountPercent) || 0
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-16">
       <p className="mono-label text-muted-foreground">Booking confirmed</p>
-      <h1 className="mt-2 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-none tracking-[-0.03em]">
+      <h1 className="mt-2 text-[clamp(2.25rem,6vw,4.5rem)] font-extrabold leading-none tracking-[-0.03em]">
         You're <span className="serif-italic font-normal text-red-deep">set.</span>
       </h1>
 
       <motion.article
         initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-10 grid border border-hairline bg-card md:grid-cols-[1fr_auto_1.2fr]"
+        className="mt-8 grid border border-hairline bg-card sm:mt-10 md:grid-cols-[1fr_auto_1.2fr]"
       >
-        <div className="p-6">
+        <div className="p-5 sm:p-6">
           <CarImage src={car.imageUrl} alt={car.name} category={car.category.name} className="aspect-[16/10]" eager />
           <p className="mono-label mt-4 text-muted-foreground">{car.make}</p>
-          <p className="display-condensed text-4xl">{car.model}</p>
+          <p className="display-condensed text-3xl sm:text-4xl">{car.model}</p>
         </div>
         {/* Perforation */}
         <div aria-hidden className="relative hidden w-8 md:block">
@@ -83,11 +85,11 @@ export default function Ticket() {
           <span className="absolute inset-y-6 left-1/2 border-l border-dashed border-hairline" />
           <span className="absolute -bottom-4 left-0 size-8 rounded-full border border-hairline bg-background" />
         </div>
-        <div className="border-t border-dashed border-hairline p-6 md:border-t-0">
-          <div className="flex items-start justify-between gap-4">
+        <div className="border-t border-dashed border-hairline p-5 sm:p-6 md:border-t-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="mono-label text-muted-foreground">Reference</p>
-              <p className="mono text-3xl font-medium tracking-wider">{bookingRef(r.id)}</p>
+              <p className="mono text-2xl font-medium tracking-wider sm:text-3xl">{bookingRef(r.id)}</p>
             </div>
             <StatusPill status={r.status === 'ACTIVE' ? 'reserved' : 'available'} />
           </div>
@@ -98,6 +100,15 @@ export default function Ticket() {
             <div><dt className="mono-label text-muted-foreground">Days</dt><dd className="mt-1">{r.days}</dd></div>
             <div><dt className="mono-label text-muted-foreground">Offer</dt><dd className="mt-1">{r.couponCode ?? (r.benefitType === 'NONE' ? '—' : r.benefitType.replace('_', ' ').toLowerCase())}{discount ? ` · ${discount}%` : ''}</dd></div>
             <div><dt className="mono-label text-muted-foreground">Total</dt><dd className="mt-1 text-lg font-medium">{formatINR(Number(r.totalAmount))}</dd></div>
+            <div className="col-span-2">
+              <dt className="mono-label text-muted-foreground">Pick-up & drop-off</dt>
+              <dd className="mt-1">
+                {BRANCH.address} ·{' '}
+                <a href={BRANCH_DIRECTIONS} target="_blank" rel="noreferrer" className="text-red-deep hover:underline">
+                  Directions
+                </a>
+              </dd>
+            </div>
           </dl>
           <div className="mt-6"><Barcode seed={r.id} /></div>
         </div>
