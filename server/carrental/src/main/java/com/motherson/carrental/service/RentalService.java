@@ -21,6 +21,7 @@ import java.util.List;
 public class RentalService {
 
 	private static final int MAX_DAYS = 30;
+	private static final int MAX_ADVANCE_DAYS = 30;
 
 	private final RentalRepository rentalRepository;
 	private final CustomerService customerService;
@@ -61,10 +62,26 @@ public class RentalService {
 		return rentalRepository.findByCustomerIdOrderByStartDateDesc(customerId);
 	}
 
-	@Transactional
+	// Old signature: the rental starts today
 	public Rental rent(String email, Long vehicleId, int days, BenefitType benefit, String couponCode) {
+		return rent(email, vehicleId, days, benefit, couponCode, null);
+	}
+
+	@Transactional
+	public Rental rent(String email, Long vehicleId, int days, BenefitType benefit, String couponCode,
+			LocalDate startDate) {
 		if (days < 1 || days > MAX_DAYS) {
 			throw new IllegalArgumentException("Rental days must be between 1 and " + MAX_DAYS);
+		}
+
+		// Pick-up date: today by default, or up to MAX_ADVANCE_DAYS ahead
+		LocalDate today = LocalDate.now();
+		LocalDate start = (startDate == null) ? today : startDate;
+		if (start.isBefore(today)) {
+			throw new IllegalArgumentException("Pick-up date cannot be in the past");
+		}
+		if (start.isAfter(today.plusDays(MAX_ADVANCE_DAYS))) {
+			throw new IllegalArgumentException("Pick-up date can be at most " + MAX_ADVANCE_DAYS + " days ahead");
 		}
 
 		Customer customer = customerService.getByEmail(email);
@@ -108,8 +125,8 @@ public class RentalService {
 		rental.setCustomer(customer);
 		rental.setVehicle(rentedVehicle);
 		rental.setDays(days);
-		rental.setStartDate(LocalDate.now());
-		rental.setEndDate(LocalDate.now().plusDays(days));
+		rental.setStartDate(start);
+		rental.setEndDate(start.plusDays(days));
 		rental.setStatus(RentalStatus.ACTIVE);
 		rental.setBenefitType(type);
 		rental.setCouponCode(appliedCode);
