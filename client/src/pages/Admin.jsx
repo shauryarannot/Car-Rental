@@ -322,7 +322,7 @@ export default function Admin() {
 
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-4xl px-6 py-24">
+      <div className="page-shell py-24">
         <p className="mono-label text-red-deep">403 — CLEARANCE REQUIRED</p>
         <h1 className="mt-3 text-[clamp(2.5rem,6vw,5rem)] font-extrabold leading-none tracking-[-0.03em]">
           Administrator access <span className="serif-italic font-normal text-red-deep">only.</span>
@@ -351,7 +351,7 @@ export default function Admin() {
   ]
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 pb-16 pt-10 sm:px-6 sm:pb-24 sm:pt-14">
+    <div className="page-shell pb-16 pt-10 sm:pb-24 sm:pt-14">
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-hairline pb-6 sm:gap-6 sm:pb-8">
         <div>

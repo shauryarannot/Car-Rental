@@ -57,7 +57,7 @@ export default function MyBookings() {
 
   if (isAdmin) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-24">
+      <div className="page-shell py-24">
         <p className="mono-label text-red-deep">ROLE · ADMIN</p>
         <h1 className="mt-2 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-none tracking-[-0.03em]">
           Administrator account.
@@ -73,7 +73,7 @@ export default function MyBookings() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-16">
+    <div className="page-shell py-10 sm:py-16">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mono-label text-muted-foreground">
@@ -126,7 +126,7 @@ export default function MyBookings() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: 40 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 10) * 0.04 }}
-                className="grid items-center gap-4 border border-hairline bg-card md:grid-cols-[200px_1fr_auto]"
+                className="grid items-center gap-4 border border-hairline bg-card md:grid-cols-[240px_1fr_auto] lg:grid-cols-[280px_1fr_auto]"
               >
                 <CarImage src={car.imageUrl} alt={car.name} category={car.category.name} className="aspect-[16/10] w-full" />
                 <div className="min-w-0 p-4 md:py-4 md:pl-2">

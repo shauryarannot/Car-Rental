@@ -67,6 +67,12 @@ export default function Fleet() {
     return s
   }, [cars.data, onlyAvailable, category, maxPrice, q, sort])
 
+  const resetFilters = () => {
+    const next = new URLSearchParams({ days: String(days) })
+    if (start !== today()) next.set('start', start)
+    setParams(next, { replace: true })
+  }
+
   const filters = (
     <div className="space-y-8">
       <div>
@@ -94,26 +100,18 @@ export default function Fleet() {
         <span className="text-sm font-medium">Show only available</span>
         <input type="checkbox" checked={onlyAvailable} onChange={(e) => set('available', e.target.checked ? null : 'false')} className="size-5 accent-[var(--odo-signal)]" />
       </label>
-      <Button
-        variant="secondary"
-        className="w-full"
-        onClick={() => {
-          const next = new URLSearchParams({ days: String(days) })
-          if (start !== today()) next.set('start', start)
-          setParams(next, { replace: true })
-        }}
-      >
+      <Button variant="secondary" className="w-full" onClick={resetFilters}>
         Reset filters
       </Button>
     </div>
   )
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6 sm:pb-24">
+    <div className="pb-16 sm:pb-24">
       {/* Top filter bar (normal flow at the top of the page, never floating mid-screen) */}
-      <div className="-mx-4 border-b border-hairline bg-card px-4 py-4 sm:-mx-6 sm:px-6">
-        <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+      <div className="border-b border-hairline bg-card py-4">
+        <div className="page-shell grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-[repeat(5,minmax(0,1fr))_minmax(220px,1.35fr)]">
+          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Pick-up date</span>
             <input
               type="date"
@@ -130,7 +128,7 @@ export default function Fleet() {
             />
           </label>
 
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Duration</span>
             <select
               value={days}
@@ -146,7 +144,7 @@ export default function Fleet() {
             </select>
           </label>
 
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Return date</span>
             <input
               type="date"
@@ -159,7 +157,7 @@ export default function Fleet() {
             />
           </label>
 
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Category</span>
             <select
               value={category}
@@ -176,7 +174,7 @@ export default function Fleet() {
             </select>
           </label>
 
-          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Sort by</span>
             <select
               value={sort}
@@ -198,48 +196,54 @@ export default function Fleet() {
             onChange={(e) => set('q', e.target.value)}
             placeholder="Search a model…"
             aria-label="Search a model"
-            className="col-span-2 min-h-12 flex-1 border border-hairline bg-card px-3 text-sm text-ink outline-none focus:border-signal sm:min-w-44 sm:max-w-xs"
+            className="col-span-2 min-h-12 w-full border border-hairline bg-card px-3 text-sm text-ink outline-none focus:border-signal sm:col-span-1"
           />
 
-          <button type="button" className="mono-label col-span-2 min-h-11 border border-hairline bg-card px-4 sm:min-h-12 lg:hidden" onClick={() => setShowFilters(true)}>
+          <button
+            type="button"
+            className="mono-label col-span-2 min-h-11 border border-hairline bg-card px-4 sm:col-span-3 sm:min-h-12 lg:hidden"
+            onClick={() => setShowFilters(true)}
+          >
             Filters
           </button>
         </div>
       </div>
 
-      <h1 className="pt-8 text-[clamp(2.5rem,7vw,6rem)] font-extrabold leading-none tracking-[-0.03em] sm:pt-12">
-        The fleet<sup className="mono ml-2 align-super text-base font-normal text-muted-foreground">{list.length}</sup>
-      </h1>
+      <div className="page-shell">
+        <h1 className="pt-8 text-[clamp(2.5rem,7vw,6rem)] font-extrabold leading-none tracking-[-0.03em] sm:pt-12">
+          The fleet<sup className="mono ml-2 align-super text-base font-normal text-muted-foreground">{list.length}</sup>
+        </h1>
 
-      <div className="mt-8 grid gap-8 sm:mt-10 sm:gap-10 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]">
-        <aside className="hidden lg:block">
-          <div className="sticky top-20">{filters}</div>
-        </aside>
+        <div className="mt-8 grid gap-8 sm:mt-10 sm:gap-10 lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-20">{filters}</div>
+          </aside>
 
-        <div>
-          {cars.isError ? (
-            <div role="alert" className="border border-hairline p-10">
-              <p className="serif-italic text-5xl">The garage is closed.</p>
-              <p className="mt-2 text-muted-foreground">We couldn't reach the server. Try again.</p>
-              <Button variant="secondary" className="mt-6" onClick={() => cars.refetch()}>Retry</Button>
-            </div>
-          ) : cars.isLoading ? (
-            <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 9 }, (_, i) => <CarCardSkeleton key={i} />)}
-            </div>
-          ) : list.length === 0 ? (
-            <div className="border border-hairline p-10">
-              <p className="serif-italic text-5xl">Nothing on the lot.</p>
-              <p className="mt-2 text-muted-foreground">No car matches these filters.</p>
-              <Button variant="secondary" className="mt-6" onClick={() => setParams(new URLSearchParams({ days: String(days) }))}>Reset filters</Button>
-            </div>
-          ) : (
-            <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-3">
-              {list.map((c, i) => (
-                <CarCard key={c.id} car={c} days={days} start={start} index={i} />
-              ))}
-            </div>
-          )}
+          <div>
+            {cars.isError ? (
+              <div role="alert" className="border border-hairline p-10">
+                <p className="serif-italic text-5xl">The garage is closed.</p>
+                <p className="mt-2 text-muted-foreground">We couldn't reach the server. Try again.</p>
+                <Button variant="secondary" className="mt-6" onClick={() => cars.refetch()}>Retry</Button>
+              </div>
+            ) : cars.isLoading ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,270px),1fr))] items-stretch gap-6">
+                {Array.from({ length: 12 }, (_, i) => <CarCardSkeleton key={i} />)}
+              </div>
+            ) : list.length === 0 ? (
+              <div className="border border-hairline p-10">
+                <p className="serif-italic text-5xl">Nothing on the lot.</p>
+                <p className="mt-2 text-muted-foreground">No car matches these filters.</p>
+                <Button variant="secondary" className="mt-6" onClick={resetFilters}>Reset filters</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,270px),1fr))] items-stretch gap-6">
+                {list.map((c, i) => (
+                  <CarCard key={c.id} car={c} days={days} start={start} index={i} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

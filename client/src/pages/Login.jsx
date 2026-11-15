@@ -44,19 +44,19 @@ export default function Login() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-[1440px] items-center px-4 py-10 sm:px-6 sm:py-16">
-      <div className="mx-auto grid w-full max-w-5xl items-center gap-8 sm:gap-12 lg:grid-cols-2">
-        <div>
+    <div className="page-shell flex min-h-[calc(100vh-3.5rem)] items-center py-10 sm:py-16">
+      <div className="grid w-full items-center gap-8 sm:gap-12 lg:grid-cols-12">
+        <div className="lg:col-span-6 xl:col-span-7">
           <p className="mono-label text-red-deep">Welcome back</p>
           <h1 className="mt-3 text-[clamp(2.5rem,6.5vw,5.5rem)] font-extrabold leading-[0.92] tracking-[-0.03em] [font-variation-settings:'wdth'_125] sm:mt-4">
             Sign <span className="serif-italic font-normal text-red-deep">in.</span>
           </h1>
-          <p className="mt-4 max-w-md text-muted-foreground">
+          <p className="mt-4 max-w-lg text-muted-foreground">
             Sign in to browse the fleet, manage your bookings and pick up where you left off.
           </p>
         </div>
 
-        <div className="ticks border border-hairline bg-card p-6 sm:p-10">
+        <div className="ticks border border-hairline bg-card p-6 sm:p-10 lg:col-span-6 xl:col-span-5">
           <div className="border-b border-hairline pb-4">
             <p className="mono-label text-ink">Sign in to your account</p>
           </div>

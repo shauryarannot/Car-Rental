@@ -68,17 +68,17 @@ export function Navbar() {
         scrolled ? 'border-hairline bg-background/95 text-ink backdrop-blur-sm' : 'border-transparent bg-red-bright text-white',
       )}
     >
-      <nav aria-label="Primary" className="mx-auto flex h-14 max-w-[1440px] items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:gap-8">
+      <nav aria-label="Primary" className="page-shell flex h-14 items-center gap-4 sm:gap-6 lg:gap-10">
         <Link to="/" className="wordmark shrink-0 text-xl">
           Ryde.exe
         </Link>
 
-        <ul className="hidden items-center gap-6 md:flex">
+        <ul className="hidden items-center gap-6 md:flex lg:gap-8">
           {links.map((l) => (
             <li key={l.to}>
               <NavLink
                 to={l.to}
-                className={({ isActive }) => cn('text-sm font-medium underline-offset-8 hover:underline', isActive && 'underline')}
+                className={({ isActive }) => cn('whitespace-nowrap text-sm font-medium underline-offset-8 hover:underline', isActive && 'underline')}
               >
                 {l.label}
               </NavLink>
@@ -86,7 +86,7 @@ export function Navbar() {
           ))}
         </ul>
 
-        <div className="ml-auto flex items-center gap-2 sm:gap-4">
+        <div className="ml-auto flex items-center gap-2 sm:gap-4 lg:gap-5">
           <div ref={themeRef} className="relative">
             <button
               type="button"
@@ -150,12 +150,12 @@ export function Navbar() {
                 >
                   {roleLabel}
                 </span>
-                <span className="mono-label max-w-36 truncate">{user.name}</span>
+                <span className="mono-label max-w-44 truncate lg:max-w-56">{user.name}</span>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="mono-label min-h-9 border border-current/30 px-3 transition-colors duration-200 hover:bg-ink hover:text-paper"
+                className="mono-label min-h-9 shrink-0 border border-current/30 px-3 transition-colors duration-200 hover:bg-ink hover:text-paper"
               >
                 Sign out
               </button>
@@ -189,7 +189,7 @@ export function Navbar() {
       />
 
       {open && (
-        <ul id="mobile-menu" className="border-t border-hairline bg-background px-4 py-4 text-ink sm:px-6 md:hidden">
+        <ul id="mobile-menu" className="page-shell border-t border-hairline bg-background py-4 text-ink md:hidden">
           {links.map((l) => (
             <li key={l.label}>
               <Link to={l.to} onClick={() => setOpen(false)} className="flex min-h-11 items-center text-lg font-medium">

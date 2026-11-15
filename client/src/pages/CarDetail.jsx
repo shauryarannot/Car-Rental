@@ -130,7 +130,7 @@ export default function CarDetail() {
 
   if (car.isLoading) {
     return (
-      <div className="mx-auto grid max-w-[1440px] gap-10 px-6 py-12 lg:grid-cols-12">
+      <div className="page-shell grid gap-10 py-12 lg:grid-cols-12">
         <Skeleton className="aspect-[16/10] lg:col-span-7" />
         <div className="space-y-4 lg:col-span-5"><Skeleton className="h-4 w-24" /><Skeleton className="h-16 w-3/4" /><Skeleton className="h-40" /></div>
       </div>
@@ -139,7 +139,7 @@ export default function CarDetail() {
   if (car.isError || !car.data) {
     const notFound = isApiError(car.error) && car.error.status === 404
     return (
-      <div className="mx-auto max-w-[1440px] px-6 py-24">
+      <div className="page-shell py-24">
         <p className="serif-italic text-5xl">{notFound ? 'Wrong turn.' : 'The garage is closed.'}</p>
         <p className="mt-2 text-muted-foreground">{notFound ? "That car isn't in the fleet." : "We couldn't reach the server. Try again."}</p>
         <Button asChild variant="secondary" className="mt-6"><Link to="/fleet">Back to the fleet</Link></Button>
@@ -170,7 +170,7 @@ export default function CarDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6 sm:pb-24">
+    <div className="page-shell pb-16 sm:pb-24">
       <nav aria-label="Breadcrumb" className="mono-label py-4 text-muted-foreground sm:py-6">
         <Link to="/fleet" className="hover:text-ink">Fleet</Link> / <span>{c.category.name}</span> / <span className="text-ink">{c.name}</span>
       </nav>

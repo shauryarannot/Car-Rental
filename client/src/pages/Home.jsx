@@ -163,8 +163,8 @@ export default function Home() {
 
         <div className="absolute inset-0 -z-10 bg-black/40" />
 
-        <div className="mx-auto grid max-w-[1440px] gap-8 px-4 pb-10 pt-12 sm:gap-10 sm:px-6 sm:pb-12 sm:pt-16 lg:grid-cols-12 lg:pt-24">
-          <div className="lg:col-span-7">
+        <div className="page-shell grid gap-8 pb-10 pt-12 sm:gap-10 sm:pb-14 sm:pt-16 lg:grid-cols-12 lg:pt-24">
+          <div className="lg:col-span-9 xl:col-span-8">
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -206,7 +206,7 @@ export default function Home() {
       </section>
 
       {/* Motherson Employee Benefits Promotional Banner */}
-      <section aria-labelledby="motherson-benefits-heading" className="mx-auto max-w-[1440px] px-4 pt-12 sm:px-6 sm:pt-16">
+      <section aria-labelledby="motherson-benefits-heading" className="page-shell pt-12 sm:pt-16">
         <div className="ticks relative overflow-hidden border border-hairline bg-card p-5 sm:p-10">
           <div className="grid items-center gap-8 lg:grid-cols-12">
             <div className="lg:col-span-6 xl:col-span-7">
@@ -227,7 +227,7 @@ export default function Home() {
                 <span className="serif-italic font-normal text-red-deep">Motherson Employees</span>
               </h2>
 
-              <p className="mt-3 max-w-2xl text-base italic text-muted-foreground sm:text-lg">
+              <p className="mt-3 max-w-3xl text-base italic text-muted-foreground sm:text-lg">
                 Enjoy special discounts on your car rentals. Your employee benefits can be used across multiple bookings!
               </p>
 
@@ -257,7 +257,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:col-span-6 xl:col-span-5">
+            <div className="grid items-stretch gap-4 sm:grid-cols-2 lg:col-span-6 xl:col-span-5">
               {(employeeCoupons.length > 0
                 ? employeeCoupons
                 : [
@@ -306,9 +306,9 @@ export default function Home() {
       </section>
 
       {/* Categories */}
-      <section className="mx-auto max-w-[1440px] px-4 pt-16 sm:px-6 sm:pt-24">
+      <section className="page-shell pt-16 sm:pt-24">
         <SectionHeader n={2} label="Browse by type" />
-        <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-4 xl:grid-cols-8">
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:mt-8 sm:grid-cols-4 sm:gap-4 xl:grid-cols-8">
           {categoryList.map((c) => {
             const n = available.filter((x) => x.category.id === c.id).length
             const pct = Number(c.discountPercent) || 0
@@ -333,7 +333,7 @@ export default function Home() {
       </section>
 
       {/* Featured */}
-      <section className="mx-auto max-w-[1440px] px-4 py-16 sm:px-6 sm:py-24">
+      <section className="page-shell py-16 sm:py-24">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionHeader n={3} label="Ready to go" className="min-w-48 flex-1" />
           <Link to="/fleet" className="text-sm font-medium text-red-deep hover:underline">See the fleet →</Link>
@@ -353,34 +353,36 @@ export default function Home() {
 
       {/* How it works */}
       <section className="border-y border-hairline bg-card">
-        <ol className="mx-auto grid max-w-[1440px] items-stretch sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ['Choose', 'Pick a car from the lot.'],
-            ['Days', 'Up to 30 days, book up to 30 days ahead.'],
-            ['Confirm', 'Add your details and a coupon if you have one.'],
-            ['Collect', 'Show your ticket at pick-up.'],
-          ].map(([t, d], i) => (
-            <li
-              key={t}
-              className={cn(
-                'flex h-full flex-col justify-between border-hairline p-6 sm:p-8',
-                i < 3 && 'border-b sm:border-b-0',
-                i < 2 && 'sm:border-b lg:border-b-0',
-                i % 2 === 0 && 'sm:border-r',
-                i === 1 && 'lg:border-r',
-              )}
-            >
-              <span className="mono text-5xl font-light text-steel sm:text-6xl">0{i + 1}</span>
-              <div className="mt-5 sm:mt-6">
-                <p className="text-xl font-semibold">{t}</p>
-                <p className="mt-1 text-muted-foreground">{d}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="page-shell">
+          <ol className="grid items-stretch border-x border-hairline sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ['Choose', 'Pick a car from the lot.'],
+              ['Days', 'Up to 30 days, book up to 30 days ahead.'],
+              ['Confirm', 'Add your details and a coupon if you have one.'],
+              ['Collect', 'Show your ticket at pick-up.'],
+            ].map(([t, d], i) => (
+              <li
+                key={t}
+                className={cn(
+                  'flex h-full flex-col justify-between border-hairline p-6 sm:p-8',
+                  i < 3 && 'border-b sm:border-b-0',
+                  i < 2 && 'sm:border-b lg:border-b-0',
+                  i % 2 === 0 && 'sm:border-r',
+                  i === 1 && 'lg:border-r',
+                )}
+              >
+                <span className="mono text-5xl font-light text-steel sm:text-6xl">0{i + 1}</span>
+                <div className="mt-5 sm:mt-6">
+                  <p className="text-xl font-semibold">{t}</p>
+                  <p className="mt-1 text-muted-foreground">{d}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       </section>
 
-      <section className="mx-auto max-w-[1440px] px-4 pt-16 sm:px-6 sm:pt-24">
+      <section className="page-shell pt-16 sm:pt-24">
         <SectionHeader n={4} label="Where to find us" />
         <div className="mt-6 sm:mt-8">
           <PickupLocation />
@@ -389,9 +391,9 @@ export default function Home() {
 
       {/* Offers */}
       {generalCoupons.length > 0 && (
-        <section className="mx-auto max-w-[1440px] px-4 py-16 sm:px-6 sm:py-24">
+        <section className="page-shell py-16 sm:py-24">
           <SectionHeader n={5} label="Offers" />
-          <ul className="mt-6 grid items-stretch gap-4 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          <ul className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] items-stretch gap-4 sm:mt-8 sm:gap-5">
             {generalCoupons.map((c) => (
               <li key={c.id} className="ticks flex h-full flex-col justify-between border border-dashed border-hairline bg-card p-5 sm:p-6">
                 <p className="mono text-4xl font-medium text-red-deep">{Number(c.discountPercent)}%</p>
@@ -410,7 +412,7 @@ export default function Home() {
 
       {/* Closing */}
       <section className="bg-[var(--odo-signal)] text-white">
-        <div className="mx-auto flex max-w-[1440px] flex-col items-start justify-between gap-6 px-4 py-16 sm:flex-row sm:items-end sm:gap-8 sm:px-6 sm:py-24">
+        <div className="page-shell flex flex-col items-start justify-between gap-6 py-16 sm:flex-row sm:items-end sm:gap-8 sm:py-24">
           <p className="serif-italic text-[clamp(3.5rem,12vw,10rem)] leading-none">Where to?</p>
           <Button asChild className="w-full bg-white text-red-deep hover:bg-[var(--odo-red-tint)] sm:w-auto"><Link to="/fleet">See the fleet →</Link></Button>
         </div>

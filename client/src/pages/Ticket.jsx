@@ -48,11 +48,11 @@ export default function Ticket() {
   const { id } = useParams()
   const q = useQuery({ queryKey: ['booking', Number(id)], queryFn: () => api.getBooking(Number(id)) })
 
-  if (q.isLoading) return <div className="mx-auto max-w-5xl px-6 py-16"><Skeleton className="h-80" /></div>
+  if (q.isLoading) return <div className="page-shell py-16"><Skeleton className="h-80" /></div>
   if (q.isError || !q.data) {
     const nf = isApiError(q.error) && q.error.status === 404
     return (
-      <div className="mx-auto max-w-5xl px-6 py-24">
+      <div className="page-shell py-24">
         <p className="serif-italic text-5xl">{nf ? 'Wrong turn.' : 'The garage is closed.'}</p>
         <p className="mt-2 text-muted-foreground">{nf ? "We couldn't find that booking." : 'Try again.'}</p>
         <Button asChild variant="secondary" className="mt-6"><Link to="/bookings">My bookings</Link></Button>
@@ -64,7 +64,7 @@ export default function Ticket() {
   const discount = Number(r.discountPercent) || 0
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-16">
+    <div className="page-shell py-10 sm:py-16">
       <p className="mono-label text-muted-foreground">Booking confirmed</p>
       <h1 className="mt-2 text-[clamp(2.25rem,6vw,4.5rem)] font-extrabold leading-none tracking-[-0.03em]">
         You're <span className="serif-italic font-normal text-red-deep">set.</span>

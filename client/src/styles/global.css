@@ -89,6 +89,14 @@
   ::selection { background: var(--odo-red-tint); color: var(--odo-red-deep); }
 }
 
+/* Shared fluid layout container (~92–94% viewport width on large screens) */
+.page-shell {
+  width: 100%;
+  max-width: 1920px;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3.5vw, 4rem);
+}
+
 /* Type utilities */
 .wordmark { font-weight: 800; font-variation-settings: 'wdth' 125; letter-spacing: -0.02em; }
 .display-xl {

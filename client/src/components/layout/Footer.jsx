@@ -5,7 +5,7 @@ export function Footer() {
   const { user, isAdmin, isCustomer } = useAuth()
   return (
     <footer className="relative overflow-hidden border-t border-hairline bg-background">
-      <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-6 px-4 pt-12 sm:grid-cols-4 sm:px-6 sm:pt-16">
+      <div className="page-shell grid grid-cols-2 gap-6 pt-12 sm:grid-cols-4 sm:pt-16">
         <div className="col-span-2">
           <p className="serif-italic text-2xl sm:text-3xl">Pick a car. Pick your days. Go.</p>
         </div>
@@ -29,7 +29,7 @@ export function Footer() {
           <span>Motherson Fleet Operations</span>
         </address>
       </div>
-      <p aria-hidden className="wordmark select-none whitespace-nowrap px-4 pb-4 pt-8 text-center text-[clamp(2.75rem,15vw,13.5rem)] leading-none text-ink sm:pt-10">
+      <p aria-hidden className="page-shell wordmark select-none whitespace-nowrap pb-4 pt-8 text-center text-[clamp(2.75rem,16.5vw,18rem)] leading-none text-ink sm:pt-10">
         Ryde.exe
       </p>
     </footer>
