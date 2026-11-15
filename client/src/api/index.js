@@ -1,4 +1,5 @@
 import { daysBetween } from '@/lib/trip'
+import { normalizeEmail } from '@/lib/utils'
 import { http, isApiError, vehicleToCar } from './http'
 
 const json = (method, body) => ({ method, body: JSON.stringify(body) })
@@ -7,9 +8,10 @@ export { isApiError }
 
 /** Spring Boot backend client with JWT auth and role-based endpoints. */
 export const api = {
-  // Auth
-  login: (req) => http('/api/auth/login', json('POST', req)),
-  register: (req) => http('/api/auth/register', json('POST', req)),
+  // Auth (normalize email to lowercase for case-insensitive sign-in & sign-up)
+  login: (req) => http('/api/auth/login', json('POST', { ...req, email: normalizeEmail(req.email) })),
+  register: (req) => http('/api/auth/register', json('POST', { ...req, email: normalizeEmail(req.email) })),
+
 
   // Browse
   async listCars(f = {}) {
@@ -61,7 +63,9 @@ export const api = {
 
   // Admin: Customers
   listCustomers: () => http('/api/customers'),
-  createCustomer: (payload) => http('/api/customers', json('POST', payload)),
-  updateCustomer: (id, payload) => http(`/api/customers/${id}`, json('PUT', payload)),
+  createCustomer: (payload) =>
+    http('/api/customers', json('POST', { ...payload, email: normalizeEmail(payload.email) })),
+  updateCustomer: (id, payload) =>
+    http(`/api/customers/${id}`, json('PUT', { ...payload, email: normalizeEmail(payload.email) })),
   deactivateCustomer: (id) => http(`/api/customers/${id}`, { method: 'DELETE' }),
 }

@@ -6,8 +6,8 @@ import { api, isApiError } from '@/api'
 import { useAuth } from '@/app/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { normalizeEmail, validateEmail } from '@/lib/utils'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const alertClass = 'flex items-center gap-2 border border-red-deep/40 bg-[var(--odo-red-tint)] px-3 py-2 text-sm text-red-deep'
 
 export default function Login() {
@@ -21,9 +21,9 @@ export default function Login() {
   const [loginErrors, setLoginErrors] = useState({})
 
   const signInMutation = useMutation({
-    mutationFn: (data) => api.login(data),
+    mutationFn: (data) => api.login({ email: normalizeEmail(data.email), password: data.password }),
     onSuccess: (res, vars) => {
-      login(res, vars.email)
+      login(res, normalizeEmail(vars.email))
       toast.success('Signed in successfully.')
       navigate(from && from !== '/login' && from !== '/signup' ? from : res.role === 'ADMIN' ? '/admin' : '/', {
         replace: true,
@@ -35,11 +35,12 @@ export default function Login() {
   const handleLoginSubmit = (e) => {
     e.preventDefault()
     const errs = {}
-    if (!EMAIL_RE.test(loginData.email.trim())) errs.email = 'Enter a valid email address.'
+    const emailErr = validateEmail(loginData.email)
+    if (emailErr) errs.email = emailErr
     if (!loginData.password) errs.password = 'Enter your password.'
     setLoginErrors(errs)
     if (!Object.keys(errs).length) {
-      signInMutation.mutate({ email: loginData.email.trim(), password: loginData.password })
+      signInMutation.mutate({ email: normalizeEmail(loginData.email), password: loginData.password })
     }
   }
 
@@ -69,7 +70,19 @@ export default function Login() {
               placeholder="you@example.com"
               value={loginData.email}
               error={loginErrors.email}
-              onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+              onBlur={() => {
+                if (loginData.email.trim()) {
+                  const emailErr = validateEmail(loginData.email)
+                  setLoginErrors((prev) => ({ ...prev, email: emailErr ?? undefined }))
+                }
+              }}
+              onChange={(e) => {
+                const nextEmail = e.target.value
+                setLoginData({ ...loginData, email: nextEmail })
+                if (loginErrors.email) {
+                  setLoginErrors((prev) => ({ ...prev, email: validateEmail(nextEmail) ?? undefined }))
+                }
+              }}
             />
             <Input
               label="Password"
@@ -78,7 +91,13 @@ export default function Login() {
               placeholder="••••••••"
               value={loginData.password}
               error={loginErrors.password}
-              onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+              onChange={(e) => {
+                const nextPassword = e.target.value
+                setLoginData({ ...loginData, password: nextPassword })
+                if (loginErrors.password && nextPassword) {
+                  setLoginErrors((prev) => ({ ...prev, password: undefined }))
+                }
+              }}
             />
 
             {signInMutation.isError && (

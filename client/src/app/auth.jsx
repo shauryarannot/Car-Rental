@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { normalizeEmail } from '@/lib/utils'
 
 const STORAGE_KEY = 'odo-auth'
 const EMPLOYEE_MAP_KEY = 'odo-employee-directory'
@@ -16,10 +17,11 @@ function readEmployeeDirectory() {
 
 function rememberEmployee(email, employeeId) {
   const cleanId = employeeId?.trim()
-  if (!cleanId) return
+  const cleanEmail = normalizeEmail(email)
+  if (!cleanId || !cleanEmail) return
   try {
     const map = readEmployeeDirectory()
-    map[email.trim().toLowerCase()] = cleanId
+    map[cleanEmail] = cleanId
     localStorage.setItem(EMPLOYEE_MAP_KEY, JSON.stringify(map))
   } catch {
     // Ignore storage quota errors
@@ -28,7 +30,7 @@ function rememberEmployee(email, employeeId) {
 
 function isMothersonEmployee(user) {
   if (!user || user.role !== 'CUSTOMER') return false
-  const normalizedEmail = user.email.trim().toLowerCase()
+  const normalizedEmail = normalizeEmail(user.email)
   if (normalizedEmail.endsWith('@motherson.com')) return true
   if (user.employeeId?.trim()) return true
   return Boolean(readEmployeeDirectory()[normalizedEmail])
@@ -40,11 +42,15 @@ function readStoredUser() {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed?.token || !parsed?.role) return null
-    return parsed
+    return {
+      ...parsed,
+      email: normalizeEmail(parsed.email),
+    }
   } catch {
     return null
   }
 }
+
 
 export function getAuthToken() {
   return readStoredUser()?.token ?? null
@@ -74,14 +80,15 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     (res, email, employeeId) => {
-      rememberEmployee(email, employeeId)
-      const resolvedEmployeeId = employeeId?.trim() || readEmployeeDirectory()[email.trim().toLowerCase()]
+      const normalizedEmail = normalizeEmail(email)
+      rememberEmployee(normalizedEmail, employeeId)
+      const resolvedEmployeeId = employeeId?.trim() || readEmployeeDirectory()[normalizedEmail]
       const next = {
         token: res.token,
         role: res.role,
         customerId: res.customerId,
         name: res.name,
-        email,
+        email: normalizedEmail,
         ...(resolvedEmployeeId ? { employeeId: resolvedEmployeeId } : {}),
       }
       resetSession()

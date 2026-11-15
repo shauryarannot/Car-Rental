@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
+import { DateInput } from '@/components/ui/date-input'
 import { useCars, useCategories } from '@/hooks/queries'
 import { DURATION_DAYS, MAX_DAYS, clampDays, clampStartDate, daysUntil, maxStartDate, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
@@ -111,16 +112,15 @@ export default function Fleet() {
       {/* Top filter bar (normal flow at the top of the page, never floating mid-screen) */}
       <div className="border-b border-hairline bg-card py-4">
         <div className="page-shell grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 xl:grid-cols-[repeat(5,minmax(0,1fr))_minmax(220px,1.35fr)]">
-          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 cursor-pointer flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Pick-up date</span>
-            <input
-              type="date"
+            <DateInput
               value={start}
               min={today()}
               max={maxStartDate()}
-              onChange={(e) => {
-                if (!e.target.value) return
-                const nextStart = clampStartDate(e.target.value)
+              fieldLabel="Pick-up date"
+              onChange={(nextIso) => {
+                const nextStart = clampStartDate(nextIso)
                 set('start', nextStart === today() ? null : nextStart)
               }}
               className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
@@ -144,14 +144,14 @@ export default function Fleet() {
             </select>
           </label>
 
-          <label className="flex min-w-0 flex-col border border-hairline bg-card px-3 py-1.5">
+          <label className="flex min-w-0 cursor-pointer flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Return date</span>
-            <input
-              type="date"
+            <DateInput
               value={returnDateFor(days, start)}
               min={returnDateFor(1, start)}
               max={returnDateFor(MAX_DAYS, start)}
-              onChange={(e) => e.target.value && set('days', String(clampDays(daysUntil(e.target.value, start))))}
+              fieldLabel="Return date"
+              onChange={(nextRet) => set('days', String(clampDays(daysUntil(nextRet, start))))}
               className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
               aria-label={`Return date, ${prettyDate(returnDateFor(days, start))}`}
             />

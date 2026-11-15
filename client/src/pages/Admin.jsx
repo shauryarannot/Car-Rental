@@ -11,14 +11,84 @@ import { Input } from '@/components/ui/input'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
 import { prettyDate } from '@/lib/trip'
-import { bookingRef, cn, formatINR } from '@/lib/utils'
+import { bookingRef, cn, formatINR, normalizeEmail, validateEmail } from '@/lib/utils'
+
+const PAGE_SIZE = 50
 
 const actionBtn = 'mono-label border border-hairline px-2.5 py-1.5 hover:border-ink'
 const dangerBtn = 'mono-label border border-hairline px-2.5 py-1.5 text-red-deep hover:border-red-deep'
 const searchClass = 'min-h-11 flex-1 border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal'
 const selectClass = 'mt-2 w-full cursor-pointer border border-hairline bg-card px-3 py-2.5 text-sm font-medium text-ink outline-none focus:border-signal'
 
-const errMsg = (e, fallback) => (isApiError(e) ? e.message : fallback)
+const errMsg = (e, fallback) =>
+  isApiError(e) &&
+  e.message &&
+  e.message !== 'Internal Server Error' &&
+  !e.message.startsWith('Request failed')
+    ? e.message
+    : fallback
+
+/** Slice an array into a 50-record page and clamp the current page into [1, totalPages]. */
+function paginate(items = [], rawPage = 1, pageSize = PAGE_SIZE) {
+  const totalRecords = items.length
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const page = Math.min(Math.max(1, rawPage), totalPages)
+  const startIndex = totalRecords === 0 ? 0 : (page - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalRecords)
+  return {
+    slice: items.slice(startIndex, endIndex),
+    page,
+    totalPages,
+    totalRecords,
+    start: totalRecords === 0 ? 0 : startIndex + 1,
+    end: endIndex,
+  }
+}
+
+function PaginationBar({ pagination, onPageChange, noun = 'records' }) {
+  const { page, totalPages, totalRecords, start, end } = pagination
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 border border-hairline bg-card px-4 py-3">
+      <p className="mono-label text-muted-foreground">
+        {totalRecords === 0
+          ? `0 ${noun} found`
+          : `Showing ${start}–${end} of ${totalRecords} ${noun} · Page ${page} of ${totalPages}`}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={page <= 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          aria-label="Previous page"
+          className={cn(
+            actionBtn,
+            'min-h-9 px-3',
+            page <= 1 && 'pointer-events-none opacity-40',
+          )}
+        >
+          ← Previous
+        </button>
+        <span className="mono px-2 text-xs font-medium text-ink">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          aria-label="Next page"
+          className={cn(
+            actionBtn,
+            'min-h-9 px-3',
+            page >= totalPages && 'pointer-events-none opacity-40',
+          )}
+        >
+          Next →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 
 function DataTable({ headers, children }) {
   return (
@@ -124,11 +194,21 @@ export default function Admin() {
   const [rentalFilter, setRentalFilter] = useState('ACTIVE')
   const [rentalSearch, setRentalSearch] = useState('')
   const [custSearch, setCustSearch] = useState('')
+  const [pages, setPages] = useState({
+    fleet: 1,
+    rentals: 1,
+    categories: 1,
+    coupons: 1,
+    customers: 1,
+  })
+  const setTabPage = (section, nextPage) =>
+    setPages((prev) => ({ ...prev, [section]: nextPage }))
 
   const [vehicleModal, setVehicleModal] = useState(null)
   const [categoryModal, setCategoryModal] = useState(null)
   const [couponModal, setCouponModal] = useState(null)
   const [customerModal, setCustomerModal] = useState(null)
+  const [customerEmailError, setCustomerEmailError] = useState(null)
   const [historyCustomer, setHistoryCustomer] = useState(null)
 
   const customerHistoryQuery = useQuery({
@@ -234,9 +314,14 @@ export default function Admin() {
 
   const saveCustomer = useMutation({
     mutationFn: (c) => {
+      const emailErr = validateEmail(c.email)
+      if (emailErr) {
+        setCustomerEmailError(emailErr)
+        throw new Error(emailErr)
+      }
       const payload = {
         name: c.name.trim(),
-        email: c.email.trim(),
+        email: normalizeEmail(c.email),
         phone: c.phone.trim() || null,
         employeeId: c.employeeId.trim() || null,
       }
@@ -245,9 +330,14 @@ export default function Admin() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] })
       setCustomerModal(null)
+      setCustomerEmailError(null)
       toast.success('Customer saved.')
     },
-    onError: (e) => toast.error(errMsg(e, 'Failed to save customer.')),
+    onError: (e) => {
+      const msg = isApiError(e) ? e.message : e?.message || 'Failed to save customer.'
+      if (/email/i.test(msg)) setCustomerEmailError(msg)
+      toast.error(msg)
+    },
   })
 
   const deactivateCustomer = useMutation({
@@ -302,8 +392,14 @@ export default function Admin() {
     return list
   }, [bookings.data, rentalFilter, rentalSearch])
 
+  // Exclude ADMIN accounts from customer counts and the customer directory
+  const customerAccounts = useMemo(
+    () => (customers.data ?? []).filter((c) => c.role !== 'ADMIN'),
+    [customers.data],
+  )
+
   const filteredCustomers = useMemo(() => {
-    const list = customers.data ?? []
+    const list = customerAccounts
     if (!custSearch) return list
     const q = custSearch.toLowerCase()
     return list.filter(
@@ -312,7 +408,13 @@ export default function Admin() {
         c.email.toLowerCase().includes(q) ||
         c.employeeId?.toLowerCase().includes(q),
     )
-  }, [customers.data, custSearch])
+  }, [customerAccounts, custSearch])
+
+  const fleetPage = useMemo(() => paginate(filteredCars, pages.fleet), [filteredCars, pages.fleet])
+  const rentalsPage = useMemo(() => paginate(filteredRentals, pages.rentals), [filteredRentals, pages.rentals])
+  const categoriesPage = useMemo(() => paginate(categories.data ?? [], pages.categories), [categories.data, pages.categories])
+  const couponsPage = useMemo(() => paginate(coupons.data ?? [], pages.coupons), [coupons.data, pages.coupons])
+  const customersPage = useMemo(() => paginate(filteredCustomers, pages.customers), [filteredCustomers, pages.customers])
 
   const openNewVehicleModal = () =>
     setVehicleModal({ name: '', dailyRate: 2500, available: true, categoryId: categories.data?.[0]?.id ?? 1 })
@@ -347,7 +449,7 @@ export default function Admin() {
     { id: 'rentals', label: 'Rentals & Timeline', count: bookings.data?.length },
     { id: 'categories', label: 'Categories', count: categories.data?.length },
     { id: 'coupons', label: 'Coupons', count: coupons.data?.length },
-    { id: 'customers', label: 'Customers', count: customers.data?.length },
+    { id: 'customers', label: 'Customers', count: customers.data ? customerAccounts.length : undefined },
   ]
 
   return (
@@ -376,7 +478,7 @@ export default function Admin() {
           { label: 'Cumulative Revenue', value: stats.revenue, prefix: '₹', sub: `Across ${stats.totalRentals} rentals` },
           { label: 'Active on the Road', value: stats.activeCount, suffix: ' Cars', sub: 'Currently dispatched' },
           { label: 'Available on the Lot', value: stats.availCars, suffix: ` / ${stats.totalCars}`, sub: 'Ready for immediate booking' },
-          { label: 'Active Customers', value: customers.data?.length ?? 0, sub: 'Verified accounts' },
+          { label: 'Active Customers', value: customerAccounts.length, sub: 'Verified customer accounts' },
           { label: 'Active Coupons', value: coupons.data?.length ?? 0, sub: 'Available offers' },
         ].map((s, i) => (
           <div
@@ -430,13 +532,19 @@ export default function Admin() {
             <input
               type="search"
               value={carSearch}
-              onChange={(e) => setCarSearch(e.target.value)}
+              onChange={(e) => {
+                setCarSearch(e.target.value)
+                setTabPage('fleet', 1)
+              }}
               placeholder="Filter vehicles by make or model…"
               className={cn(searchClass, 'sm:max-w-sm')}
             />
             <select
               value={carCatFilter}
-              onChange={(e) => setCarCatFilter(e.target.value)}
+              onChange={(e) => {
+                setCarCatFilter(e.target.value)
+                setTabPage('fleet', 1)
+              }}
               className="min-h-11 cursor-pointer border border-hairline bg-card px-4 text-sm text-ink outline-none focus:border-signal"
             >
               <option value="" className="bg-card text-ink">All categories</option>
@@ -451,8 +559,14 @@ export default function Admin() {
             </Button>
           </div>
 
+          <PaginationBar
+            pagination={fleetPage}
+            onPageChange={(p) => setTabPage('fleet', p)}
+            noun="vehicles"
+          />
+
           <DataTable headers={['ID', 'Vehicle', 'Category', 'Daily Rate', 'Status', 'Actions']}>
-            {filteredCars.map((c) => (
+            {fleetPage.slice.map((c) => (
               <tr key={c.id} className="hover:bg-surface-alt/50">
                 <td className="mono p-4 text-muted-foreground">#{c.id}</td>
                 <td className="p-4 font-semibold">
@@ -498,6 +612,14 @@ export default function Admin() {
               </tr>
             ))}
           </DataTable>
+
+          {fleetPage.totalPages > 1 && (
+            <PaginationBar
+              pagination={fleetPage}
+              onPageChange={(p) => setTabPage('fleet', p)}
+              noun="vehicles"
+            />
+          )}
         </div>
       )}
 
@@ -510,7 +632,10 @@ export default function Admin() {
                 <button
                   key={status}
                   type="button"
-                  onClick={() => setRentalFilter(status)}
+                  onClick={() => {
+                    setRentalFilter(status)
+                    setTabPage('rentals', 1)
+                  }}
                   className={cn(
                     'mono-label min-h-11 px-4 transition-colors',
                     rentalFilter === status ? 'bg-ink text-paper' : 'text-ink hover:bg-surface-alt',
@@ -523,17 +648,23 @@ export default function Admin() {
             <input
               type="search"
               value={rentalSearch}
-              onChange={(e) => setRentalSearch(e.target.value)}
+              onChange={(e) => {
+                setRentalSearch(e.target.value)
+                setTabPage('rentals', 1)
+              }}
               placeholder="Search by customer, vehicle, or reference (Ryde.exe-…)…"
               className={cn(searchClass, 'sm:max-w-md')}
             />
-            <span className="mono-label ml-auto text-muted-foreground">
-              Showing {Math.min(filteredRentals.length, 150)} of {filteredRentals.length}
-            </span>
           </div>
 
+          <PaginationBar
+            pagination={rentalsPage}
+            onPageChange={(p) => setTabPage('rentals', p)}
+            noun="rentals"
+          />
+
           <DataTable headers={['Ref', 'Customer', 'Vehicle', 'Dates & Duration', 'Benefit', 'Total', 'Status', 'Actions']}>
-            {filteredRentals.slice(0, 150).map((r) => (
+            {rentalsPage.slice.map((r) => (
               <tr key={r.id} className="hover:bg-surface-alt/50">
                 <td className="mono p-4 font-medium">
                   <Link to={`/bookings/${r.id}`} className="hover:underline">
@@ -575,6 +706,14 @@ export default function Admin() {
               </tr>
             ))}
           </DataTable>
+
+          {rentalsPage.totalPages > 1 && (
+            <PaginationBar
+              pagination={rentalsPage}
+              onPageChange={(p) => setTabPage('rentals', p)}
+              noun="rentals"
+            />
+          )}
         </div>
       )}
 
@@ -587,8 +726,14 @@ export default function Admin() {
             </Button>
           </div>
 
+          <PaginationBar
+            pagination={categoriesPage}
+            onPageChange={(p) => setTabPage('categories', p)}
+            noun="categories"
+          />
+
           <DataTable headers={['ID', 'Category Name', 'Category Discount', 'Vehicles Assigned', 'Actions']}>
-            {categories.data?.map((cat) => {
+            {categoriesPage.slice.map((cat) => {
               const count = cars.data?.filter((v) => v.category.id === cat.id).length ?? 0
               return (
                 <tr key={cat.id} className="hover:bg-surface-alt/50">
@@ -620,6 +765,14 @@ export default function Admin() {
               )
             })}
           </DataTable>
+
+          {categoriesPage.totalPages > 1 && (
+            <PaginationBar
+              pagination={categoriesPage}
+              onPageChange={(p) => setTabPage('categories', p)}
+              noun="categories"
+            />
+          )}
         </div>
       )}
 
@@ -632,8 +785,14 @@ export default function Admin() {
             </Button>
           </div>
 
+          <PaginationBar
+            pagination={couponsPage}
+            onPageChange={(p) => setTabPage('coupons', p)}
+            noun="coupons"
+          />
+
           <DataTable headers={['ID', 'Coupon Code', 'Type', 'Discount', 'Qualification Rule', 'Actions']}>
-            {coupons.data?.map((cp) => (
+            {couponsPage.slice.map((cp) => (
               <tr key={cp.id} className="hover:bg-surface-alt/50">
                 <td className="mono p-4 text-muted-foreground">#{cp.id}</td>
                 <td className="mono p-4 font-semibold">{cp.code}</td>
@@ -670,6 +829,14 @@ export default function Admin() {
               </tr>
             ))}
           </DataTable>
+
+          {couponsPage.totalPages > 1 && (
+            <PaginationBar
+              pagination={couponsPage}
+              onPageChange={(p) => setTabPage('coupons', p)}
+              noun="coupons"
+            />
+          )}
         </div>
       )}
 
@@ -680,21 +847,33 @@ export default function Admin() {
             <input
               type="search"
               value={custSearch}
-              onChange={(e) => setCustSearch(e.target.value)}
+              onChange={(e) => {
+                setCustSearch(e.target.value)
+                setTabPage('customers', 1)
+              }}
               placeholder="Search customers by name, email, or employee ID…"
               className={cn(searchClass, 'sm:max-w-md')}
             />
             <Button
               variant="secondary"
               className="ml-auto"
-              onClick={() => setCustomerModal({ name: '', email: '', phone: '', employeeId: '' })}
+              onClick={() => {
+                setCustomerEmailError(null)
+                setCustomerModal({ name: '', email: '', phone: '', employeeId: '' })
+              }}
             >
               + New Customer
             </Button>
           </div>
 
+          <PaginationBar
+            pagination={customersPage}
+            onPageChange={(p) => setTabPage('customers', p)}
+            noun="customers"
+          />
+
           <DataTable headers={['ID', 'Name', 'Email', 'Phone', 'Employee ID', 'Role', 'Actions']}>
-            {filteredCustomers.map((cust) => (
+            {customersPage.slice.map((cust) => (
               <tr key={cust.id} className="hover:bg-surface-alt/50">
                 <td className="mono p-4 text-muted-foreground">#{cust.id}</td>
                 <td className="p-4 font-semibold">{cust.name}</td>
@@ -711,7 +890,8 @@ export default function Admin() {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        setCustomerEmailError(null)
                         setCustomerModal({
                           id: cust.id,
                           name: cust.name,
@@ -719,7 +899,7 @@ export default function Admin() {
                           phone: cust.phone ?? '',
                           employeeId: cust.employeeId ?? '',
                         })
-                      }
+                      }}
                       className={actionBtn}
                     >
                       Edit
@@ -734,6 +914,14 @@ export default function Admin() {
               </tr>
             ))}
           </DataTable>
+
+          {customersPage.totalPages > 1 && (
+            <PaginationBar
+              pagination={customersPage}
+              onPageChange={(p) => setTabPage('customers', p)}
+              noun="customers"
+            />
+          )}
         </div>
       )}
 
@@ -912,7 +1100,14 @@ export default function Admin() {
               label="Email Address"
               type="email"
               value={customerModal.email}
-              onChange={(e) => setCustomerModal({ ...customerModal, email: e.target.value })}
+              error={customerEmailError}
+              onChange={(e) => {
+                const nextEmail = e.target.value
+                setCustomerModal({ ...customerModal, email: nextEmail })
+                if (customerEmailError) {
+                  setCustomerEmailError(validateEmail(nextEmail))
+                }
+              }}
               required
             />
             <Input

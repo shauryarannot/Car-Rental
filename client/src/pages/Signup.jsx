@@ -6,8 +6,8 @@ import { api, isApiError } from '@/api'
 import { useAuth } from '@/app/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { normalizeEmail, validateEmail } from '@/lib/utils'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const alertClass = 'flex items-center gap-2 border border-red-deep/40 bg-[var(--odo-red-tint)] px-3 py-2 text-sm text-red-deep'
 
 export default function Signup() {
@@ -28,32 +28,44 @@ export default function Signup() {
 
   const registerMutation = useMutation({
     mutationFn: async (data) => {
+      const normalizedEmail = normalizeEmail(data.email)
       await api.register({
         name: data.name.trim(),
-        email: data.email.trim(),
+        email: normalizedEmail,
         password: data.password,
         phone: data.phone.trim() || undefined,
         employeeId: data.employeeId.trim() || undefined,
       })
-      return api.login({ email: data.email.trim(), password: data.password })
+      return api.login({ email: normalizedEmail, password: data.password })
     },
     onSuccess: (res, vars) => {
-      login(res, vars.email.trim(), vars.employeeId)
+      login(res, normalizeEmail(vars.email), vars.employeeId)
       toast.success('Account created. Welcome aboard.')
       navigate(from && from !== '/login' && from !== '/signup' ? from : '/', { replace: true })
     },
-    onError: (e) => toast.error(isApiError(e) ? e.message : 'Could not register account.'),
+    onError: (e) => {
+      const msg = isApiError(e) ? e.message : 'Could not register account.'
+      if (/email/i.test(msg)) {
+        setRegErrors((prev) => ({ ...prev, email: msg }))
+      }
+      toast.error(msg)
+    },
   })
 
   const handleRegisterSubmit = (e) => {
     e.preventDefault()
     const errs = {}
     if (regData.name.trim().length < 2) errs.name = 'Enter your full name.'
-    if (!EMAIL_RE.test(regData.email.trim())) errs.email = 'Enter a valid email address.'
-    if (regData.password.length < 6) errs.password = 'Password must be at least 6 characters.'
+    const emailErr = validateEmail(regData.email)
+    if (emailErr) errs.email = emailErr
+    if (!regData.password) {
+      errs.password = 'Password is required.'
+    } else if (regData.password.length < 6) {
+      errs.password = 'Password must be at least 6 characters.'
+    }
     setRegErrors(errs)
     if (!Object.keys(errs).length) {
-      registerMutation.mutate(regData)
+      registerMutation.mutate({ ...regData, email: normalizeEmail(regData.email) })
     }
   }
 
@@ -82,7 +94,13 @@ export default function Signup() {
               placeholder="Your full name"
               value={regData.name}
               error={regErrors.name}
-              onChange={(e) => setRegData({ ...regData, name: e.target.value })}
+              onChange={(e) => {
+                const nextName = e.target.value
+                setRegData({ ...regData, name: nextName })
+                if (regErrors.name && nextName.trim().length >= 2) {
+                  setRegErrors((prev) => ({ ...prev, name: undefined }))
+                }
+              }}
             />
             <Input
               label="Email address"
@@ -91,7 +109,19 @@ export default function Signup() {
               placeholder="you@example.com"
               value={regData.email}
               error={regErrors.email}
-              onChange={(e) => setRegData({ ...regData, email: e.target.value })}
+              onBlur={() => {
+                if (regData.email.trim()) {
+                  const emailErr = validateEmail(regData.email)
+                  setRegErrors((prev) => ({ ...prev, email: emailErr ?? undefined }))
+                }
+              }}
+              onChange={(e) => {
+                const nextEmail = e.target.value
+                setRegData({ ...regData, email: nextEmail })
+                if (regErrors.email) {
+                  setRegErrors((prev) => ({ ...prev, email: validateEmail(nextEmail) ?? undefined }))
+                }
+              }}
             />
             <Input
               label="Password"
@@ -100,7 +130,13 @@ export default function Signup() {
               placeholder="At least 6 characters"
               value={regData.password}
               error={regErrors.password}
-              onChange={(e) => setRegData({ ...regData, password: e.target.value })}
+              onChange={(e) => {
+                const nextPassword = e.target.value
+                setRegData({ ...regData, password: nextPassword })
+                if (regErrors.password && nextPassword.length >= 6) {
+                  setRegErrors((prev) => ({ ...prev, password: undefined }))
+                }
+              }}
             />
             <div className="grid gap-5 sm:grid-cols-2">
               <Input

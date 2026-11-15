@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { vehicleToCar } from '@/api/http'
 import { Button } from '@/components/ui/button'
+import { DateInput } from '@/components/ui/date-input'
 import { SectionHeader } from '@/components/ui/section-header'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { PickupLocation } from '@/components/car/PickupLocation'
 import { useCars, useCategories, useCoupons } from '@/hooks/queries'
-import { DURATION_DAYS, MAX_DAYS, returnDateFor, daysUntil, clampDays, clampStartDate, maxStartDate, prettyDate, today } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, returnDateFor, daysUntil, clampDays, clampStartDate, maxStartDate, prettyDate, today, validateDateRange } from '@/lib/trip'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 const ease = [0.22, 1, 0.36, 1]
 
@@ -45,6 +47,7 @@ function SearchBar() {
   const { data: cats } = useCategories()
   const categoryList = cats ?? FALLBACK_CATEGORIES
   const [start, setStart] = useState(today)
+  const [dateError, setDateError] = useState(null)
   const [days, setDays] = useState(2)
   const [cat, setCat] = useState('')
   const ret = returnDateFor(days, start)
@@ -53,21 +56,28 @@ function SearchBar() {
     <form
       onSubmit={(e) => {
         e.preventDefault()
+        const err = dateError || validateDateRange(start, today(), maxStartDate(), 'Pick-up date')
+        if (err) {
+          toast.error(err)
+          return
+        }
+        const safeStart = clampStartDate(start)
         const q = new URLSearchParams({ days: String(days) })
-        if (start && start !== today()) q.set('start', start)
+        if (safeStart && safeStart !== today()) q.set('start', safeStart)
         if (cat) q.set('category', cat)
         navigate(`/fleet?${q}`)
       }}
       className="grid w-full grid-cols-1 border border-hairline bg-card text-ink sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"
     >
-      <label className="flex flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
+      <label className="flex cursor-pointer flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
         <span className="mono-label text-muted-foreground">Pick-up date</span>
-        <input
-          type="date"
+        <DateInput
           value={start}
           min={today()}
           max={maxStartDate()}
-          onChange={(e) => e.target.value && setStart(clampStartDate(e.target.value))}
+          fieldLabel="Pick-up date"
+          onErrorChange={setDateError}
+          onChange={(nextIso) => setStart(clampStartDate(nextIso))}
           aria-label={`Pick-up date, ${prettyDate(start)}`}
           className="mt-1 w-full cursor-pointer bg-card font-medium text-ink outline-none"
         />
@@ -88,14 +98,14 @@ function SearchBar() {
         </select>
       </label>
 
-      <label className="flex flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
+      <label className="flex cursor-pointer flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
         <span className="mono-label text-muted-foreground">Return date</span>
-        <input
-          type="date"
+        <DateInput
           value={ret}
           min={returnDateFor(1, start)}
           max={returnDateFor(MAX_DAYS, start)}
-          onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value, start)))}
+          fieldLabel="Return date"
+          onChange={(nextRet) => setDays(clampDays(daysUntil(nextRet, start)))}
           className="mt-1 w-full cursor-pointer bg-card font-medium text-ink outline-none"
         />
       </label>

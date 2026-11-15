@@ -9,11 +9,12 @@ import { useCar, useCars, useCategories, useCoupons } from '@/hooks/queries'
 import { CarImage } from '@/components/car/CarImage'
 import { CarCard } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
+import { DateInput } from '@/components/ui/date-input'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
-import { MAX_DAYS, DURATION_DAYS, clampDays, clampStartDate, daysUntil, maxStartDate, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { MAX_DAYS, DURATION_DAYS, clampDays, clampStartDate, daysUntil, maxStartDate, prettyDate, returnDateFor, today, validateDateRange } from '@/lib/trip'
 import { BRANCH } from '@/lib/location'
 import { cn, formatINR } from '@/lib/utils'
 
@@ -105,6 +106,7 @@ export default function CarDetail() {
   const coupons = useCoupons()
 
   const [startDate, setStartDate] = useState(() => clampStartDate(params.get('start')))
+  const [dateError, setDateError] = useState(null)
   const [days, setDays] = useState(clampDays(Number(params.get('days') ?? 2)))
   const [benefit, setBenefit] = useState('NONE')
   const [couponCode, setCouponCode] = useState('')
@@ -233,6 +235,11 @@ export default function CarDetail() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
+                  const err = dateError || validateDateRange(startDate, today(), maxStartDate(), 'Pick-up date')
+                  if (err) {
+                    toast.error(err)
+                    return
+                  }
                   book.mutate()
                 }}
                 className="mt-8 space-y-8 border-t border-hairline pt-8"
@@ -254,14 +261,15 @@ export default function CarDetail() {
                 <fieldset>
                   <legend className="mono-label text-muted-foreground">Trip duration & dates</legend>
                   <div className="mt-3 grid grid-cols-1 border border-hairline bg-card sm:grid-cols-2">
-                    <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-r">
+                    <label className="flex cursor-pointer flex-col justify-between border-b border-hairline p-4 sm:border-r">
                       <span className="mono-label text-muted-foreground">Pick-up date</span>
-                      <input
-                        type="date"
+                      <DateInput
                         value={startDate}
                         min={today()}
                         max={maxStartDate()}
-                        onChange={(e) => e.target.value && setStartDate(clampStartDate(e.target.value))}
+                        fieldLabel="Pick-up date"
+                        onErrorChange={setDateError}
+                        onChange={(nextIso) => setStartDate(clampStartDate(nextIso))}
                         className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
                       />
                       <span className="mono-label mt-2 text-muted-foreground">
@@ -269,14 +277,14 @@ export default function CarDetail() {
                       </span>
                     </label>
 
-                    <label className="flex flex-col justify-between border-b border-hairline p-4">
+                    <label className="flex cursor-pointer flex-col justify-between border-b border-hairline p-4">
                       <span className="mono-label text-muted-foreground">Return date</span>
-                      <input
-                        type="date"
+                      <DateInput
                         value={returnDateFor(days, startDate)}
                         min={returnDateFor(1, startDate)}
                         max={returnDateFor(MAX_DAYS, startDate)}
-                        onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value, startDate)))}
+                        fieldLabel="Return date"
+                        onChange={(nextRet) => setDays(clampDays(daysUntil(nextRet, startDate)))}
                         className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
                       />
                       <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days, startDate))}</span>
