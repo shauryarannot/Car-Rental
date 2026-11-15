@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { Button } from '@/components/ui/button'
 import { useCars, useCategories } from '@/hooks/queries'
-import { DURATION_DAYS, MAX_DAYS, clampDays, daysUntil, prettyDate, returnDateFor } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, clampDays, clampStartDate, daysUntil, maxStartDate, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { cn, formatINR } from '@/lib/utils'
 
 const sorts = [
@@ -37,6 +37,7 @@ export default function Fleet() {
   const [showFilters, setShowFilters] = useState(false)
 
   // All filter state lives in the URL so a view can be shared.
+  const start = clampStartDate(params.get('start'))
   const days = clampDays(Number(params.get('days') ?? 1))
   const category = params.get('category') ?? ''
   const onlyAvailable = params.get('available') !== 'false'
@@ -93,7 +94,15 @@ export default function Fleet() {
         <span className="text-sm font-medium">Show only available</span>
         <input type="checkbox" checked={onlyAvailable} onChange={(e) => set('available', e.target.checked ? null : 'false')} className="size-5 accent-[var(--odo-signal)]" />
       </label>
-      <Button variant="secondary" className="w-full" onClick={() => setParams(new URLSearchParams({ days: String(days) }), { replace: true })}>
+      <Button
+        variant="secondary"
+        className="w-full"
+        onClick={() => {
+          const next = new URLSearchParams({ days: String(days) })
+          if (start !== today()) next.set('start', start)
+          setParams(next, { replace: true })
+        }}
+      >
         Reset filters
       </Button>
     </div>
@@ -105,6 +114,23 @@ export default function Fleet() {
       <div className="-mx-4 border-b border-hairline bg-card px-4 py-4 sm:-mx-6 sm:px-6">
         <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
+            <span className="mono-label text-muted-foreground">Pick-up date</span>
+            <input
+              type="date"
+              value={start}
+              min={today()}
+              max={maxStartDate()}
+              onChange={(e) => {
+                if (!e.target.value) return
+                const nextStart = clampStartDate(e.target.value)
+                set('start', nextStart === today() ? null : nextStart)
+              }}
+              className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
+              aria-label={`Pick-up date, ${prettyDate(start)}`}
+            />
+          </label>
+
+          <label className="flex flex-col border border-hairline bg-card px-3 py-1.5">
             <span className="mono-label text-muted-foreground">Duration</span>
             <select
               value={days}
@@ -114,7 +140,7 @@ export default function Fleet() {
             >
               {DURATION_DAYS.map((d) => (
                 <option key={d} value={d} className="bg-card text-ink">
-                  {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d))})
+                  {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d, start))})
                 </option>
               ))}
             </select>
@@ -124,12 +150,12 @@ export default function Fleet() {
             <span className="mono-label text-muted-foreground">Return date</span>
             <input
               type="date"
-              value={returnDateFor(days)}
-              min={returnDateFor(1)}
-              max={returnDateFor(MAX_DAYS)}
-              onChange={(e) => e.target.value && set('days', String(clampDays(daysUntil(e.target.value))))}
+              value={returnDateFor(days, start)}
+              min={returnDateFor(1, start)}
+              max={returnDateFor(MAX_DAYS, start)}
+              onChange={(e) => e.target.value && set('days', String(clampDays(daysUntil(e.target.value, start))))}
               className="mt-0.5 w-full cursor-pointer bg-card text-sm font-medium text-ink outline-none"
-              aria-label={`Return date, ${prettyDate(returnDateFor(days))}`}
+              aria-label={`Return date, ${prettyDate(returnDateFor(days, start))}`}
             />
           </label>
 
@@ -210,7 +236,7 @@ export default function Fleet() {
           ) : (
             <div className="grid items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {list.map((c, i) => (
-                <CarCard key={c.id} car={c} days={days} index={i} />
+                <CarCard key={c.id} car={c} days={days} start={start} index={i} />
               ))}
             </div>
           )}

@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusPill } from '@/components/ui/status-pill'
 import { Counter } from '@/components/fx/Counter'
-import { MAX_DAYS, DURATION_DAYS, clampDays, daysUntil, prettyDate, returnDateFor, today } from '@/lib/trip'
+import { MAX_DAYS, DURATION_DAYS, clampDays, clampStartDate, daysUntil, maxStartDate, prettyDate, returnDateFor, today } from '@/lib/trip'
 import { BRANCH } from '@/lib/location'
 import { cn, formatINR } from '@/lib/utils'
 
@@ -104,6 +104,7 @@ export default function CarDetail() {
   const categories = useCategories()
   const coupons = useCoupons()
 
+  const [startDate, setStartDate] = useState(() => clampStartDate(params.get('start')))
   const [days, setDays] = useState(clampDays(Number(params.get('days') ?? 2)))
   const [benefit, setBenefit] = useState('NONE')
   const [couponCode, setCouponCode] = useState('')
@@ -112,8 +113,8 @@ export default function CarDetail() {
     mutationFn: () =>
       api.createBooking({
         vehicleId: Number(id),
-        startDate: today(),
-        endDate: returnDateFor(days),
+        startDate,
+        endDate: returnDateFor(days, startDate),
         benefit,
         couponCode: benefit === 'COUPON' ? couponCode.trim().toUpperCase() : undefined,
       }),
@@ -253,7 +254,35 @@ export default function CarDetail() {
                 <fieldset>
                   <legend className="mono-label text-muted-foreground">Trip duration & dates</legend>
                   <div className="mt-3 grid grid-cols-1 border border-hairline bg-card sm:grid-cols-2">
-                    <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-b-0 sm:border-r">
+                    <label className="flex flex-col justify-between border-b border-hairline p-4 sm:border-r">
+                      <span className="mono-label text-muted-foreground">Pick-up date</span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        min={today()}
+                        max={maxStartDate()}
+                        onChange={(e) => e.target.value && setStartDate(clampStartDate(e.target.value))}
+                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                      />
+                      <span className="mono-label mt-2 text-muted-foreground">
+                        Pick-up: {startDate === today() ? `Today (${prettyDate(startDate)})` : prettyDate(startDate)}
+                      </span>
+                    </label>
+
+                    <label className="flex flex-col justify-between border-b border-hairline p-4">
+                      <span className="mono-label text-muted-foreground">Return date</span>
+                      <input
+                        type="date"
+                        value={returnDateFor(days, startDate)}
+                        min={returnDateFor(1, startDate)}
+                        max={returnDateFor(MAX_DAYS, startDate)}
+                        onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value, startDate)))}
+                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
+                      />
+                      <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days, startDate))}</span>
+                    </label>
+
+                    <label className="flex flex-col justify-between p-4 sm:col-span-2">
                       <span className="mono-label text-muted-foreground">Duration (days)</span>
                       <select
                         value={days}
@@ -262,24 +291,10 @@ export default function CarDetail() {
                       >
                         {DURATION_DAYS.map((d) => (
                           <option key={d} value={d} className="bg-card text-ink">
-                            {d} {d === 1 ? 'day' : 'days'} — {formatINR(c.pricePerDay * d)}
+                            {d} {d === 1 ? 'day' : 'days'} ({prettyDate(startDate)} → {prettyDate(returnDateFor(d, startDate))}) — {formatINR(c.pricePerDay * d)}
                           </option>
                         ))}
                       </select>
-                      <span className="mono-label mt-2 text-muted-foreground">Pick-up: Today ({prettyDate(today())})</span>
-                    </label>
-
-                    <label className="flex flex-col justify-between p-4">
-                      <span className="mono-label text-muted-foreground">Return date</span>
-                      <input
-                        type="date"
-                        value={returnDateFor(days)}
-                        min={returnDateFor(1)}
-                        max={returnDateFor(MAX_DAYS)}
-                        onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value)))}
-                        className="mt-2 w-full cursor-pointer border border-hairline bg-background px-3 py-2 text-sm font-medium text-ink outline-none focus:border-signal"
-                      />
-                      <span className="mono-label mt-2 text-muted-foreground">Return: {prettyDate(returnDateFor(days))}</span>
                     </label>
                   </div>
                   <p className="mono-label mt-3 text-muted-foreground">
@@ -380,7 +395,7 @@ export default function CarDetail() {
         <section className="mt-24">
           <p className="mono-label text-muted-foreground">More {c.category.name}</p>
           <div className="mt-6 grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {similar.map((s, i) => <CarCard key={s.id} car={s} days={days} index={i} />)}
+            {similar.map((s, i) => <CarCard key={s.id} car={s} days={days} start={startDate} index={i} />)}
           </div>
         </section>
       )}

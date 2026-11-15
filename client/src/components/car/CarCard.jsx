@@ -2,15 +2,20 @@ import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { CarImage } from './CarImage'
 import { StatusPill } from '@/components/ui/status-pill'
+import { today } from '@/lib/trip'
 import { formatINR } from '@/lib/utils'
 
 /**
  * Listing card: photo, name, category, price per day and the trip total.
  * Fixed internal row heights so every card in a grid has the exact same length.
  */
-export function CarCard({ car, days, index = 0 }) {
+export function CarCard({ car, days, start, index = 0 }) {
   const discount = Number(car.category.discountPercent) || 0
   const tripDays = days && days > 1 ? days : 1
+  const query = new URLSearchParams()
+  if (tripDays > 1) query.set('days', String(tripDays))
+  if (start && start !== today()) query.set('start', start)
+  const search = query.toString()
 
   return (
     <motion.article
@@ -21,7 +26,7 @@ export function CarCard({ car, days, index = 0 }) {
       className="group relative flex h-full flex-col border border-hairline bg-card transition-colors duration-200 hover:border-ink"
     >
       <Link
-        to={`/fleet/${car.id}${tripDays > 1 ? `?days=${tripDays}` : ''}`}
+        to={`/fleet/${car.id}${search ? `?${search}` : ''}`}
         className="absolute inset-0 z-10"
         aria-label={`${car.name}, ${formatINR(car.pricePerDay)} per day`}
       />

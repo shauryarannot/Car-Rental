@@ -7,7 +7,7 @@ import { SectionHeader } from '@/components/ui/section-header'
 import { CarCard, CarCardSkeleton } from '@/components/car/CarCard'
 import { PickupLocation } from '@/components/car/PickupLocation'
 import { useCars, useCategories, useCoupons } from '@/hooks/queries'
-import { DURATION_DAYS, MAX_DAYS, returnDateFor, daysUntil, clampDays, prettyDate } from '@/lib/trip'
+import { DURATION_DAYS, MAX_DAYS, returnDateFor, daysUntil, clampDays, clampStartDate, maxStartDate, prettyDate, today } from '@/lib/trip'
 import { cn } from '@/lib/utils'
 
 const ease = [0.22, 1, 0.36, 1]
@@ -44,24 +44,34 @@ function SearchBar() {
   const navigate = useNavigate()
   const { data: cats } = useCategories()
   const categoryList = cats ?? FALLBACK_CATEGORIES
+  const [start, setStart] = useState(today)
   const [days, setDays] = useState(2)
   const [cat, setCat] = useState('')
-  const ret = returnDateFor(days)
+  const ret = returnDateFor(days, start)
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
         const q = new URLSearchParams({ days: String(days) })
+        if (start && start !== today()) q.set('start', start)
         if (cat) q.set('category', cat)
         navigate(`/fleet?${q}`)
       }}
       className="grid w-full grid-cols-1 border border-hairline bg-card text-ink sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"
     >
-      <div className="flex flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
-        <span className="mono-label text-muted-foreground">Pick-up</span>
-        <span className="mt-1 font-medium text-ink">Today · {prettyDate(returnDateFor(0))}</span>
-      </div>
+      <label className="flex flex-col justify-center border-b border-hairline px-4 py-3 sm:border-r sm:px-5 lg:border-b-0">
+        <span className="mono-label text-muted-foreground">Pick-up date</span>
+        <input
+          type="date"
+          value={start}
+          min={today()}
+          max={maxStartDate()}
+          onChange={(e) => e.target.value && setStart(clampStartDate(e.target.value))}
+          aria-label={`Pick-up date, ${prettyDate(start)}`}
+          className="mt-1 w-full cursor-pointer bg-card font-medium text-ink outline-none"
+        />
+      </label>
 
       <label className="flex flex-col justify-center border-b border-hairline px-4 py-3 sm:px-5 lg:border-b-0 lg:border-r">
         <span className="mono-label text-muted-foreground">Duration</span>
@@ -72,7 +82,7 @@ function SearchBar() {
         >
           {DURATION_DAYS.map((d) => (
             <option key={d} value={d} className="bg-card text-ink">
-              {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d))})
+              {d} {d === 1 ? 'day' : 'days'} ({prettyDate(returnDateFor(d, start))})
             </option>
           ))}
         </select>
@@ -83,9 +93,9 @@ function SearchBar() {
         <input
           type="date"
           value={ret}
-          min={returnDateFor(1)}
-          max={returnDateFor(MAX_DAYS)}
-          onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value)))}
+          min={returnDateFor(1, start)}
+          max={returnDateFor(MAX_DAYS, start)}
+          onChange={(e) => e.target.value && setDays(clampDays(daysUntil(e.target.value, start)))}
           className="mt-1 w-full cursor-pointer bg-card font-medium text-ink outline-none"
         />
       </label>
@@ -346,7 +356,7 @@ export default function Home() {
         <ol className="mx-auto grid max-w-[1440px] items-stretch sm:grid-cols-2 lg:grid-cols-4">
           {[
             ['Choose', 'Pick a car from the lot.'],
-            ['Days', 'Up to 30 days, starting today.'],
+            ['Days', 'Up to 30 days, book up to 30 days ahead.'],
             ['Confirm', 'Add your details and a coupon if you have one.'],
             ['Collect', 'Show your ticket at pick-up.'],
           ].map(([t, d], i) => (

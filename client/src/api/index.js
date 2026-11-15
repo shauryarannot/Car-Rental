@@ -33,6 +33,7 @@ export const api = {
     if (days < 1) throw { status: 400, message: 'Return date must be after pick-up.', unreachable: false }
 
     const q = new URLSearchParams({ vehicleId: String(req.vehicleId), days: String(days) })
+    if (req.startDate) q.set('startDate', req.startDate)
     if (req.benefit && req.benefit !== 'NONE') q.set('benefit', req.benefit)
     if (req.couponCode) q.set('couponCode', req.couponCode)
     return http(`/api/rentals?${q}`, { method: 'POST' })
